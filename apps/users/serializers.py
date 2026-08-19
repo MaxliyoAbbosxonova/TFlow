@@ -12,7 +12,7 @@ from users.models import Users, Profile
 class UserModelSerializer(ModelSerializer):
     class Meta:
         model = Users
-        fields = ('email', 'role', 'phone', 'date_joined', 'profile')
+        fields = ('id','email', 'phone', 'date_joined', 'profile')
 
 
 class ProfileModelSerializer(ModelSerializer):
@@ -116,12 +116,9 @@ class PasswordResetSerializer(Serializer):
         return validated_data
 
     def save(self, validated_data):
-        user=validated_data['user']
-        new=validated_data['new_pass']
+        user = validated_data['user']
+        new = validated_data['new_pass']
         user.set_password(new)
         user.save(update_fields=['password'])
 
         return user
-
-
-from django.contrib.auth.views import PasswordResetConfirmView
