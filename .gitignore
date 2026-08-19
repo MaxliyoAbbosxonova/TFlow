@@ -1,0 +1,38 @@
+# Python kompilyatsiya va kechikmalar
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual muhit
+venv/
+ENV/
+env/.env/
+.venv/
+
+**/migrations/**
+!**/migrations/__init__.py
+# Jupyter notebook
+.ipynb_checkpoints/
+
+# Log fayllar, vaqtinchalik fayllar
+*.log
+*.tmp
+*.bak
+
+static
+media
+# Tarjima file lari
+*.mo
+# Maksfiy sozlamalar
+env/.env
+*.env
+
+# JetBrains / PyCharm (.idea) katalogi
+.idea/
+# Agar ba’zi umumiy sozlamalarni saqlamoqchi bo‘lsang, quyidagilarni “undo” qila olasan:
+# !.idea/misc.xml
+# !.idea/modules.xml
+# !.idea/vcs.xml
+
+# Qo‘shimcha: iml fayllari
+*.iml
