@@ -217,7 +217,5 @@ class TaskCreateApiView(CreateAPIView):
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
-#
-# class SubtaskListCreateAPIVIew(ListCreateAPIView):
-#     serializer_class = SubtaskModelSerializers
-#     queryset = Subtask.objects.all()
+
+

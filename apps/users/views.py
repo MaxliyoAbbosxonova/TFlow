@@ -1,4 +1,3 @@
-from django.db.migrations import serializer
 from drf_spectacular.utils import extend_schema
 from rest_framework import permissions, status
 from rest_framework.generics import GenericAPIView

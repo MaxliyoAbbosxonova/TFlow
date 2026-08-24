@@ -5,6 +5,8 @@ from django.db.models.fields import CharField
 from mptt.fields import TreeForeignKey
 from mptt.models import MPTTModel
 
+from shared.models import FileUpload
+from shared.serializers import FileUploadSerializer
 from users.models import Users
 
 
@@ -97,7 +99,7 @@ class Task(MPTTModel):
     priority = CharField(max_length=10, choices=Priority.choices, default=Priority.LOW)
     deadline = DateTimeField(null=True, blank=True)
     status = CharField(max_length=15, choices=Status.choices, default=Status.CREATED)
-    file = FileField(upload_to="tasks/", null=True, blank=True)
+    file = ForeignKey(FileUpload,on_delete=CASCADE,null=True,blank=True)
     project = ForeignKey(Project, on_delete=CASCADE, null=True)
 
     class MPTTMeta:
