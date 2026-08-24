@@ -1,4 +1,4 @@
-from django.db.models import ImageField, DateTimeField
+from django.db.models import ImageField, DateTimeField, FileField
 from django.db.models import Model, OneToOneField, ManyToManyField, CASCADE, TextChoices, \
     TextField, ForeignKey, RESTRICT
 from django.db.models.fields import CharField
@@ -16,6 +16,7 @@ class Workspace(Model):
     logo = ImageField(upload_to="w_logos/",
                       null=True,
                       blank=True)
+    owner = ForeignKey(Users, on_delete=RESTRICT, null=True)
 
     def __str__(self):
         return self.name
@@ -23,7 +24,8 @@ class Workspace(Model):
 
 class Team(Model):
     name = CharField(max_length=100, unique=True)
-    workspace = ManyToManyField(Workspace, related_name='team')
+    workspace = ForeignKey(Workspace, related_name='team', on_delete=CASCADE, default=1)
+    team_lead = ForeignKey(Users, on_delete=RESTRICT, null=True)
 
     def __str__(self):
         return self.name
@@ -37,13 +39,13 @@ class WorkspaceMember(Model):
         TEAM_LEAD = "TEAM_LEAD", 'team_lead'
         EMPLOYEE = "EMPLOYEE", 'employee'
 
-    workspace = ManyToManyField(Workspace, related_name='members', null=True)
-    team = ManyToManyField(Team, related_name='members', null=True)
+    workspace = ManyToManyField(Workspace, related_name='members')
+    team = ManyToManyField(Team, related_name='members')
     user = OneToOneField(Users, related_name='members', on_delete=CASCADE)
     role = CharField(max_length=15, choices=Role.choices, default=Role.EMPLOYEE)
 
     def __str__(self):
-        return self.id
+        return self.role
 
 
 class Project(Model):
@@ -53,13 +55,22 @@ class Project(Model):
         COMPLETED = 'COMPLETED', 'completed'
         ARCHIVED = 'ARCHIVED', 'archived'
 
-    title = CharField(max_length=100, unique=True)
+    class Workflow(TextChoices):
+        TODO = 'TODO ', 'todo'
+        IN_PROGRESS = 'IN_PROGRESS', 'in_progres'
+        CODE_REVIEW = 'CODE_REVIEW', 'code_review'
+        QA = 'QA ', 'qa'
+        DONE = 'DONE ', 'done'
+
+    title = CharField(max_length=100, unique=True, default="Name")
     team = ForeignKey(Team, related_name='project', on_delete=RESTRICT, null=True)
+    workspace = ForeignKey(Workspace, related_name="products", null=True, on_delete=CASCADE)
     member = ForeignKey(WorkspaceMember, related_name='project', on_delete=RESTRICT, null=True)
     status = CharField(max_length=15, choices=Status.choices, default=Status.PLANNED)
     description = TextField(max_length=320, null=True)
     start_date = DateTimeField(auto_now_add=True)
     deadline = DateTimeField(null=True, blank=True)
+    workflow = CharField(max_length=16, choices=Workflow.choices, default=Workflow.TODO)
 
     def __str__(self):
         return self.title
@@ -86,6 +97,8 @@ class Task(MPTTModel):
     priority = CharField(max_length=10, choices=Priority.choices, default=Priority.LOW)
     deadline = DateTimeField(null=True, blank=True)
     status = CharField(max_length=15, choices=Status.choices, default=Status.CREATED)
+    file = FileField(upload_to="tasks/", null=True, blank=True)
+    project = ForeignKey(Project, on_delete=CASCADE, null=True)
 
     class MPTTMeta:
         order_insertion_by = ['title']

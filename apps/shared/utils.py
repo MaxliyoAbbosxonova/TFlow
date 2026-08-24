@@ -1,9 +1,12 @@
 import importlib
 import inspect
 
+from django.shortcuts import get_object_or_404
 from rest_framework.fields import Field
 from rest_framework.permissions import BasePermission
 from rest_framework.serializers import BaseSerializer
+
+from workspace.models import Workspace, WorkspaceMember, Team
 
 
 def _signature_parameters(func):
@@ -128,10 +131,31 @@ class RecursiveField(Field):
         return object.__getattribute__(self, name)
 
 
-class UserPermission(BasePermission):
-    def has_permission(self, request, view):
-        if request.method == "GET":
-            return request.user.is_staff
-        elif request.method=="POST":
-            return  True
-        return None
+class PermissionRemove(BasePermission):
+    def has_permission(self, request,view):
+        w_space_id = view.kwargs.get("w_space_id")
+
+        workspace = get_object_or_404(
+            Workspace,
+            id=w_space_id
+        )
+
+        if request.user.is_staff:
+            return True
+
+        if workspace.owner == request.user:
+            return True
+
+        return WorkspaceMember.objects.filter(
+            user=request.user,
+            workspace=workspace,
+            role=WorkspaceMember.Role.MANAGER
+        ).exists()
+
+
+
+class Workspace_Projects_Members(BasePermission):
+    def has_permission(self, request, w_space_id):
+        if request.method == 'GET':
+            return request.user.is_staff or Workspace(id=w_space_id).owner == request.user
+        return True

@@ -87,8 +87,12 @@ WSGI_APPLICATION = 'root.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('DB_NAME', 'tflow'),
+        'USER': os.getenv('DB_USER', 'postgres'),
+        'PASSWORD': os.getenv('DB_PASSWORD', 'postgres'),
+        'HOST': os.getenv('DB_HOST', 'db'),
+        'PORT': os.getenv('DB_PORT', '5432'),
     }
 }
 
@@ -157,8 +161,11 @@ SPECTACULAR_SETTINGS = {
     # OTHER SETTINGS
 }
 
-# user access
-# eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzg5NjI5MDEwLCJpYXQiOjE3ODcwMzcwMTAsImp0aSI6ImU2YTQ5YjAwYmQ3YjQ3M2NiY2Y3Mzc3MjBlOTEyNzBlIiwidXNlcl9pZCI6IjYifQ.oL9znbj8nPecim4JrYz_RX2PyEfxPse0wVF2_6BpkMo
+REDIS_HOST = os.getenv('REDIS_HOST')
+REDIS_PORT = os.getenv('REDIS_PORT')
+
+# user access mira
+# eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzg5Nzk5MTI2LCJpYXQiOjE3ODcyMDcxMjYsImp0aSI6IjgzMjVjYjQxZWYxYjQ1MWI4YTlmMTJhNWUxY2U2ZDVhIiwidXNlcl9pZCI6IjIifQ.QWM3rPP25QNQOBjvruRj6X2MRCVsNPHDTKi2Yg3JF_o
 
 # mila admin
 # eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzg5NjM2Njg5LCJpYXQiOjE3ODcwNDQ2ODksImp0aSI6IjRjMDM4MmNiMGEwZjRlNWRhN2Y2ZjYwYWJmMmE1MzdhIiwidXNlcl9pZCI6IjEifQ.6ZUrzUW14ppuLSfKVbrKOs694zhipV2-Njhgojj6KM0
