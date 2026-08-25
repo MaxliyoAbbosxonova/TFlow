@@ -158,6 +158,7 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'Directs tasks for members from workspace',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
     # OTHER SETTINGS
 }
 

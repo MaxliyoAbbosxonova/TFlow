@@ -1,8 +1,12 @@
 from rest_framework import status
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .models import FileUpload
 from .serializers import MultipleFileUploadSerializer, FileUploadSerializer
 
 
@@ -27,33 +31,22 @@ class MultipleFileUploadView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-from rest_framework import viewsets
-from rest_framework.response import Response
-from rest_framework import status
-from .models import FileUpload
-from .serializers import FileUploadSerializer
-
-
 class FileUploadViewSet(viewsets.ModelViewSet):
     queryset = FileUpload.objects.all()  # List all uploaded files
     serializer_class = FileUploadSerializer
 
-    def create(self, request, *args, **kwargs):
-        # Get list of files from request.FILES (client sends files under key "files")
-        files = request.FILES.getlist('files')
+    @action(
+        detail=True,
+        methods=["POST"],
+        parser_classes=[MultiPartParser],
+        url_path=r"upload/(?P<filename>[a-zA-Z0-9_]+\.mp3)",
+    )
+    def upload(self, request, **kwargs):
+        track = self.get_object()
 
-        if not files:
-            return Response(
-                {'error': 'No files submitted'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        if "file" not in request.data:
+            raise ValidationError("There is no file in the HTTP body.")
 
-            # Save each file
-        uploaded_files = []
-        for file in files:
-            serializer = self.get_serializer(data={'file': file})
-            serializer.is_valid(raise_exception=True)
-            self.perform_create(serializer)
-            uploaded_files.append(serializer.data)
-
-        return Response(uploaded_files, status=status.HTTP_201_CREATED)  
+        file = request.data["file"]
+        track.file.save(file.name, file)
+        return Response(FileUploadSerializer(track).data)
