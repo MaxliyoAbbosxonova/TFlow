@@ -44,12 +44,19 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'users',
     'workspace',
+    'shared',
+    'team',
+    'task',
+    'project',
+    'comment',
+    'notification',
+    'audit_log',
     'rest_framework',
     'drf_spectacular',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'mptt',
-    'shared'
+
 ]
 
 MIDDLEWARE = [
@@ -136,8 +143,15 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
 MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
+    "default": {
+        "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+        "OPTIONS": {
+            "host": "smtp.gmail.com",
+            "port": 587,
+            "username": os.getenv("EMAIL_HOST_USER"),
+            "password": os.getenv("EMAIL_HOST_PASSWORD"),
+            "use_tls": True,
+        },
     },
 }
 
@@ -165,8 +179,20 @@ SPECTACULAR_SETTINGS = {
 REDIS_HOST = os.getenv('REDIS_HOST')
 REDIS_PORT = os.getenv('REDIS_PORT')
 
+CELERY_BROKER_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}/0'
+CELERY_RESULT_BACKEND = f'redis://{REDIS_HOST}:{REDIS_PORT}/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'Asia/Tashkent'
+
+FRONTEND_URL = os.getenv('FRONTEND_URL')
+# qiwj rnwh deng fzry
 # user access mira
 # eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzg5Nzk5MTI2LCJpYXQiOjE3ODcyMDcxMjYsImp0aSI6IjgzMjVjYjQxZWYxYjQ1MWI4YTlmMTJhNWUxY2U2ZDVhIiwidXNlcl9pZCI6IjIifQ.QWM3rPP25QNQOBjvruRj6X2MRCVsNPHDTKi2Yg3JF_o
 
 # mila admin
-# eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzg5NjM2Njg5LCJpYXQiOjE3ODcwNDQ2ODksImp0aSI6IjRjMDM4MmNiMGEwZjRlNWRhN2Y2ZjYwYWJmMmE1MzdhIiwidXNlcl9pZCI6IjEifQ.6ZUrzUW14ppuLSfKVbrKOs694zhipV2-Njhgojj6KM0
+# eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzkxMzY3NTM4LCJpYXQiOjE3ODg3NzU1MzgsImp0aSI6ImFkNjcwYjcxYzJhMTRiYzA4NWQ3NGNiYzcwZTcwZWJlIiwidXNlcl9pZCI6IjEifQ.KrXQV4O-FkjPtM353D4h6iJP_Jy3CUPK96d-gSOVZvs
+
+
+

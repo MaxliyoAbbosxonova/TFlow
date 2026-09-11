@@ -1,16 +1,19 @@
-from drf_spectacular.utils import extend_schema
-from rest_framework.generics import ListCreateAPIView, RetrieveAPIView, RetrieveUpdateDestroyAPIView, get_object_or_404, \
-    CreateAPIView
-from rest_framework.parsers import FileUploadParser, MultiPartParser, FormParser
-from rest_framework.permissions import IsAdminUser
+from drf_spectacular.utils import extend_schema, PolymorphicProxySerializer
+from rest_framework.generics import ListCreateAPIView, RetrieveAPIView, RetrieveUpdateDestroyAPIView, get_object_or_404
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 
-from shared.utils import Workspace_Projects_Members
-from workspace.models import Workspace, Team, WorkspaceMember, Project, Task
-from workspace.serializers import WorkspaceModelSerializer, TeamModelSerializer, WorkspaceMembersModelSerializer, \
-    ProjectModelSerializer, WorkspaceProjectsModelSerializer, \
-    WorkspaceMembersModelSerializers, TaskModelSerializer, TaskAdminModelSerializer
+from services.invitation import create_invitation
+from services.workspace import Invitation_Accept, Invitation_Anonymouse_Accept
+from shared.permissions import Workspace_Projects_Members
+from workspace.models import Workspace, WorkspaceMember
+from workspace.serializers import WorkspaceModelSerializer, WorkspaceMembersModelSerializer, \
+    WorkspaceProjectsModelSerializer, \
+    WorkspaceMembersModelSerializers, WorkspaceInvitationModelSerializer, CheckTokenSerializer, \
+    InvitationAcceptModelSerializer, InvitationAnonymousAcceptModelSerializer
+from workspace.tasks import send_invitation_accept_email_task
 
 
 # Create your views here.
@@ -32,6 +35,7 @@ class WorkspaceRetrieveApiView(RetrieveUpdateDestroyAPIView):
     serializer_class = WorkspaceModelSerializer
 
 
+@extend_schema(tags=["Workspace"])
 class ChangeOwnerApiView(APIView):
 
     def post(self, request, workspace_id, member_id):
@@ -68,97 +72,22 @@ class ChangeOwnerApiView(APIView):
 @extend_schema(tags=["Workspace"])
 class RemoveWorkspaceMemberView(APIView):
 
-    def post(self, request, member_id, w_space_id):
+    def delete(self, request, member_id, w_space_id):
         member = get_object_or_404(
             WorkspaceMember,
             id=member_id
         )
 
-        workspace = get_object_or_404(
-            Workspace,
-            id=w_space_id
-        )
-
-        if not member.workspace.filter(id=w_space_id).exists():
+        if not member.workspace_id == w_space_id:
             return Response(
                 {"detail": "Member boshqa workspace'ga tegishli."},
                 status=400
             )
-
-        member.workspace.remove(workspace)
-
+        WorkspaceMember.objects.filter(id=member_id).delete()
         return Response(
             {"detail": "Member workspace'dan chiqarildi."},
             status=200
         )
-
-
-# Bo'ldi v
-@extend_schema(tags=["Team"])
-class TeamListCreateApiView(ListCreateAPIView):
-    queryset = Team.objects.all()
-    serializer_class = TeamModelSerializer
-
-    def has_permission(self, request):
-        if request.method == "GET":
-            return request.user.is_staff
-        elif request.method == "POST" or request.method == "PATCH" or request.method == "PUT":
-            if ((Team.workspace.owner or Team.team_lead) is WorkspaceMember.objects.filter(
-                    user=self.request.user)) or self.request.user.is_staff:
-                return True
-        return None
-
-
-# Bo'ldi v
-@extend_schema(tags=["Team"])
-class AddTeamMemberView(APIView):
-
-    def post(self, request, member_id, team_id):
-        member = get_object_or_404(WorkspaceMember, id=member_id)
-        team = get_object_or_404(Team, id=team_id)
-
-        if team.workspace_id != member.workspace_id:
-            return Response(
-                {"detail": "Team boshqa workspace'ga tegishli."},
-                status=400
-            )
-        member.team.add(team)
-
-        return Response({"detail": "Member Teamga qo'shildi ."})
-
-
-# Bo'ldi v
-@extend_schema(tags=["Team"])
-class RemoveTeamMemberView(APIView):
-
-    def has_permission(self, request):
-        if request.method == "GET":
-            return request.user.is_staff
-        elif request.method == "POST" or request.method == "PATCH" or request.method == "PUT":
-            if ((Team.workspace.owner or Team.team_lead) is WorkspaceMember.objects.filter(
-                    user=self.request.user)) or self.request.user.is_staff:
-                return True
-        return None
-
-    def post(self, request, member_id, team_id):
-        member = get_object_or_404(WorkspaceMember, id=member_id)
-        team = get_object_or_404(Team, id=team_id)
-
-        if team.workspace_id != member.workspace_id:
-            return Response(
-                {"detail": "Team boshqa workspace'ga tegishli."},
-                status=400
-            )
-        member.team.remove(team)
-
-        return Response({"detail": "Member Teamga qo'shildi ."})
-
-
-# Bo'ldi v
-@extend_schema(tags=["Team"])
-class TeamUpdateDestroyApiView(RetrieveUpdateDestroyAPIView):
-    queryset = Team.objects.all()
-    serializer_class = TeamModelSerializer
 
 
 # Bo'ldi v
@@ -184,38 +113,69 @@ class W_MemberCreateApiView(ListCreateAPIView):
     serializer_class = WorkspaceMembersModelSerializers
 
 
-# Bo'ldi v
-@extend_schema(tags=["Projects"])
-class ProjectCreateApiView(CreateAPIView):
-    serializer_class = ProjectModelSerializer
-    permission_classes = (Workspace_Projects_Members,)
-    queryset = Project.objects.all()
+@extend_schema(tags=['Workspace'])
+class InvitationCreateApiView(APIView):
+    serializer_class = WorkspaceInvitationModelSerializer
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        invitation = create_invitation(serializer.validated_data)
+
+        return Response({'detail': "invitation sended", 'data': invitation.email}, status=HTTP_200_OK)
 
 
-# Bo'ldi v
-@extend_schema(tags=["Projects"])
-class ProjectRetrieveUpdateDestroyApiView(RetrieveUpdateDestroyAPIView):
-    serializer_class = ProjectModelSerializer
-    permission_classes = (Workspace_Projects_Members,)
-    queryset = Project.objects.all()
+@extend_schema(tags=['Workspace'])
+class CheckTokenApiView(APIView):
+    serializer_class = CheckTokenSerializer
+
+    def get(self, request, token):
+        serializer = self.serializer_class(data={'token': token})
+        serializer.is_valid(raise_exception=True)
+        return Response({'data': serializer.validated_data
+                         }, status=HTTP_200_OK)
 
 
-class TaskListApiView(ListCreateAPIView):
-    serializer_class = TaskAdminModelSerializer
-    queryset = Task.objects.all()
-    permission_classes = (IsAdminUser,)
-    parser_classes = [MultiPartParser, FormParser]
-
-class TaskCreateApiView(CreateAPIView):
-    serializer_class = TaskModelSerializer
-    queryset = Task.objects.all()
-    parser_classes = [MultiPartParser, FormParser]
+class InvitationAcceptApiView(APIView):
+    permission_classes = (AllowAny,)
 
     @extend_schema(
-        request=TaskModelSerializer,
-        responses=TaskModelSerializer,
+        request=PolymorphicProxySerializer(
+            component_name='InvitationAcceptRequest',
+            serializers=[
+                InvitationAcceptModelSerializer,  # tizimga kirgan uchun
+                InvitationAnonymousAcceptModelSerializer,  # kirmagan uchun
+            ],
+            resource_type_field_name=None,  # bizda "type" degan ajratuvchi field yo'q
+        ),
+        responses={200: dict},  # yoki mos response serializer
+        description=(
+                "Taklifni qabul qilish. Agar foydalanuvchi tizimga kirgan bo'lsa, "
+                "faqat `token` yuboriladi. Kirmagan bo'lsa — `token, email, phone, "
+                "password, profile` yuborilishi shart."
+        ),
     )
-    def post(self, request, *args, **kwargs):
-        return super().post(request, *args, **kwargs)
-
-
+    def post(self, request, token):
+        if request.user.is_authenticated:
+            serializer = InvitationAcceptModelSerializer(data={**request.data, 'token': token},
+                                                         context={'request': request})
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            member = Invitation_Accept(serializer.validated_data)
+            send_invitation_accept_email_task(member)
+            return Response({
+                'detail': 'Taklif qabul qilindi. Siz endi workspace a\'zosisiz.',
+                'workspace_id': member.workspace_id,
+                'role': member.role,
+            }, status=HTTP_200_OK)
+        serializer = InvitationAnonymousAcceptModelSerializer(data={**request.data, 'token': token},
+                                                              context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        member = Invitation_Anonymouse_Accept(serializer.validated_data)
+        send_invitation_accept_email_task(member)
+        return Response({
+            'detail': 'Taklif qabul qilindi. Siz endi workspace a\'zosisiz.',
+            'workspace_id': member.workspace_id,
+            'role': member.role,
+        }, status=HTTP_200_OK)

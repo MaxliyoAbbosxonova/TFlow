@@ -14,6 +14,7 @@ class UsersAdmin(UserAdmin):
     list_display_links = ('email',)
 
     list_display = (
+        'id',
         'email',
         'phone',
         'profile',

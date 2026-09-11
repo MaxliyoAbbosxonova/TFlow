@@ -1,31 +1,16 @@
+import re
+
+from django.core.exceptions import ValidationError
 from django.db import transaction
-from rest_framework import serializers
-from rest_framework.serializers import ModelSerializer, ListSerializer
+from django.utils import timezone
+from rest_framework.exceptions import ValidationError
+from rest_framework.fields import UUIDField, EmailField, CharField
+from rest_framework.serializers import ModelSerializer, Serializer
 
-from shared.utils import RecursiveField
-from workspace.models import Team, Project, Task, WorkspaceMember, Workspace
-
-
-class TeamModelSerializer(ModelSerializer):
-    class Meta:
-        model = Team
-        fields = "__all__"
-
-    def create(self, validated_data):
-        with transaction.atomic():
-            team_lead = validated_data['team_lead']
-            workspace = validated_data['workspace']
-            team = Team.objects.create(**validated_data)
-            WorkspaceMember(user=team_lead, workspace=workspace).role = WorkspaceMember.Role.TEAM_LEAD
-        return team
-
-
-class TaskAdminModelSerializer(ModelSerializer):
-    children = ListSerializer(child=RecursiveField(), source='get_children', read_only=True)
-
-    class Meta:
-        model = Task
-        fields = "__all__"
+from project.serializers import ProjectModelSerializer
+from users.models import Users, Profile
+from users.serializers import ProfileModelSerializer
+from workspace.models import WorkspaceMember, Workspace, WorkspaceInvitation
 
 
 class WorkspaceMembersModelSerializers(ModelSerializer):
@@ -66,12 +51,6 @@ class WorkspaceMembersModelSerializer(ModelSerializer):
         fields = ('id', 'members')
 
 
-class ProjectModelSerializer(ModelSerializer):
-    class Meta:
-        model = Project
-        fields = "__all__"
-
-
 class WorkspaceProjectsModelSerializer(ModelSerializer):
     products = ProjectModelSerializer(many=True)
 
@@ -80,9 +59,96 @@ class WorkspaceProjectsModelSerializer(ModelSerializer):
         fields = ('id', 'products')
 
 
-class TaskModelSerializer(ModelSerializer):
-    children = ListSerializer(child=RecursiveField(), source='get_children', read_only=True)
-
+class WorkspaceInvitationModelSerializer(ModelSerializer):
     class Meta:
-        model = Task
-        fields = "__all__"
+        model = WorkspaceInvitation
+        fields = ('workspace', 'email', 'role')
+
+    def validate(self, validated_data):
+        workspace = validated_data['workspace']
+        request = self.context['request']
+        member = WorkspaceMember.objects.filter(user=request.user, workspace=workspace).first()
+        if member is None:
+            raise ValidationError('Siz bu workspace a`zosi emassiz')
+        validated_data['invited_by'] = member
+        return validated_data
+
+
+class CheckTokenSerializer(Serializer):
+    token = UUIDField()
+
+    def validate(self, validated_data):
+        token = validated_data['token']
+        invitation = WorkspaceInvitation.objects.filter(token=token).first()
+        workspace = Workspace.objects.filter(id=invitation.workspace.id).first()
+        if not invitation:
+            raise ValidationError(" Bunday Taklif havolasi mavjud emas ")
+        if invitation.expires_at <= timezone.now():
+            raise ValidationError(" Tokenning muddati o'tgan ")
+        if invitation.status != WorkspaceInvitation.Status.PENDING:
+            raise ValidationError('Token yaroqsiz ')
+        validated_data['workspace'] = workspace.id
+        validated_data['invited_by'] = invitation.invited_by.id
+        validated_data['role'] = invitation.role
+        validated_data['invitation'] = invitation.id
+
+        return validated_data
+
+
+class InvitationAnonymousAcceptModelSerializer(Serializer):
+    token = UUIDField(required=True)
+    email = EmailField(required=True)
+    phone = CharField(required=True)
+    password = CharField(required=True)
+    profile = ProfileModelSerializer(required=True)
+
+    def validate_phone(self, validated_data):
+        digits = re.findall(r'\d', validated_data)
+        if len(digits) < 9:
+            raise ValidationError('Phone number must be at least 9 digits')
+        phone = ''.join(digits)
+        return phone.removeprefix('998')
+
+    def validate(self, validated_data):
+        token = validated_data['token']
+        invitation = WorkspaceInvitation.objects.filter(token=token).first()
+        if not invitation:
+            raise ValidationError('taklif havolasi mavjud emas ! ')
+        if invitation.expires_at <= timezone.now():
+            raise ValidationError(" Tokenning muddati o'tgan ")
+        if invitation.status != WorkspaceInvitation.Status.PENDING:
+            raise ValidationError('Token yaroqsiz ')
+        if invitation.email != validated_data['email']:
+            raise ValidationError('Email mos kelmadi')
+
+        return validated_data
+
+
+
+
+class InvitationAcceptModelSerializer(Serializer):
+    token = UUIDField(required=True)
+
+    def validate_phone(self, validated_data):
+        digits = re.findall(r'\d', validated_data)
+        if len(digits) < 9:
+            raise ValidationError('Phone number must be at least 9 digits')
+        phone = ''.join(digits)
+        return phone.removeprefix('998')
+
+    def validate(self, validated_data):
+        token = validated_data['token']
+        invitation = WorkspaceInvitation.objects.filter(token=token).first()
+        if not invitation:
+            raise ValidationError('taklif havolasi mavjud emas ! ')
+        if invitation.expires_at <= timezone.now():
+            raise ValidationError(" Tokenning muddati o'tgan ")
+        if invitation.status != WorkspaceInvitation.Status.PENDING:
+            raise ValidationError('Token yaroqsiz ')
+        request = self.context['request']
+        if invitation.email != request.user.email:
+            raise ValidationError('Email mos kelmadi')
+
+        return validated_data
+
+    

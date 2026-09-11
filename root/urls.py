@@ -26,6 +26,12 @@ urlpatterns = [
                   path('admin/', admin.site.urls),
                   path('auth/', include('users.urls')),
                   path('workspaces/',include('workspace.urls')),
+                  path('tasks/',include('task.urls')),
+                  path('teams/',include('team.urls')),
+                  path('projects/',include('project.urls')),
+                  path('comments/',include('comment.urls')),
+                  path('notifications/',include('notification.urls')),
+                  path('audit_logs/',include('audit_log.urls')),
                   path('files/',include('shared.urls')),
                   path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
                   # Optional UI:

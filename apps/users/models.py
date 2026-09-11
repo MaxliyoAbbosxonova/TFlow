@@ -1,6 +1,7 @@
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser
 from django.db.models import CharField, Model, ImageField, CASCADE, OneToOneField
+from django.db.models.enums import TextChoices
 from django.db.models.fields import DateTimeField, EmailField, TextField
 from django.utils import timezone
 
@@ -78,13 +79,17 @@ class Profile(Model):
 
 
 class Users(AbstractUser):
+    class Status(TextChoices):
+        ACTIVE = 'ACTIVE', 'active'
+        BLOCKED = 'BLOCKED', 'blocked'
+
     username = None
     email = EmailField(max_length=50, unique=True, null=False)
     profile = OneToOneField(Profile, on_delete=CASCADE, null=True, related_name='user')
     phone = CharField(max_length=14, default=901234567)
     date_joined = DateTimeField(default=timezone.now)
     objects = UserManager()
-
+    status=CharField(max_length=15,choices=Status.choices,default=Status.ACTIVE)
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["phone"]
 

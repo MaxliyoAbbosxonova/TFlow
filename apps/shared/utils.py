@@ -1,12 +1,11 @@
 import importlib
 import inspect
+import time
+from random import randint
 
-from django.shortcuts import get_object_or_404
+import redis
 from rest_framework.fields import Field
-from rest_framework.permissions import BasePermission
 from rest_framework.serializers import BaseSerializer
-
-from workspace.models import Workspace, WorkspaceMember, Team
 
 
 def _signature_parameters(func):
@@ -131,31 +130,50 @@ class RecursiveField(Field):
         return object.__getattribute__(self, name)
 
 
-class PermissionRemove(BasePermission):
-    def has_permission(self, request,view):
-        w_space_id = view.kwargs.get("w_space_id")
-
-        workspace = get_object_or_404(
-            Workspace,
-            id=w_space_id
-        )
-
-        if request.user.is_staff:
-            return True
-
-        if workspace.owner == request.user:
-            return True
-
-        return WorkspaceMember.objects.filter(
-            user=request.user,
-            workspace=workspace,
-            role=WorkspaceMember.Role.MANAGER
-        ).exists()
+redis_client = redis.StrictRedis(host='redis', port=6379, db=0, decode_responses=True)
 
 
+def random_code():
+    return randint(100_000, 999_999)
 
-class Workspace_Projects_Members(BasePermission):
-    def has_permission(self, request, w_space_id):
-        if request.method == 'GET':
-            return request.user.is_staff or Workspace(id=w_space_id).owner == request.user
-        return True
+
+def _get_login_key(email):
+    return f'login:{email}'
+
+
+def send_sms_code(email: str, code: int, ttl_seconds=120):
+    redis_key = f'login:{email}'
+    data = redis_client.hgetall(redis_key)
+    if data:
+        sent_at = float(data.get("sent_at"))
+        passed = time.time() - sent_at
+        remain = ttl_seconds - passed
+
+        if remain > 0:
+            return {
+                "allowed": False,
+                "remain_seconds": round(remain)
+
+            }
+    print(f"[TEST] Email: {email}, Code: {code}")
+    redis_client.hmset(redis_key, {
+        "sent_at": time.time(),
+        "code": code
+    })
+    redis_client.expire(redis_key, ttl_seconds)
+
+    return {
+        "allowed": True,
+        "remain_seconds": 0
+    }
+
+
+def check_sms_code(email: str, code: int):
+    redis_key = f"login:{email}"
+    data = redis_client.hgetall(redis_key)
+    if not data:
+        return False
+    saved_code = data.get("code")
+    print(saved_code, code)
+
+    return str(saved_code) == str(code)

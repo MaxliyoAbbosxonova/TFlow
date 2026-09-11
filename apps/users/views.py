@@ -1,6 +1,7 @@
+from django.core.mail import send_mail
 from drf_spectacular.utils import extend_schema
 from rest_framework import permissions, status
-from rest_framework.generics import GenericAPIView
+from rest_framework.generics import GenericAPIView, UpdateAPIView
 from rest_framework.generics import ListAPIView, ListCreateAPIView
 from rest_framework.permissions import IsAdminUser, AllowAny
 from rest_framework.response import Response
@@ -10,9 +11,11 @@ from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenViewBase
 
+from shared.utils import random_code, send_sms_code
 from users.models import Users, Profile
 from users.serializers import UserModelSerializer, Register, ProfileModelSerializer, LoginSerializer, \
-    RefreshTokenSerializer, PasswordResetSerializer
+    RefreshTokenSerializer, PasswordResetSerializer, SendSmsCodeSerializer, CheckSmsCodeSerializer, \
+    ChangeUserStatusSerializer
 
 
 # Create your views here.
@@ -112,11 +115,67 @@ class LogoutView(GenericAPIView):
         sz.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+
 class Password_Reset(APIView):
-    serializer_class=PasswordResetSerializer
+    serializer_class = PasswordResetSerializer
     permission_classes = (AllowAny,)
 
-    def post(self,request):
-        serializer=self.serializer_class(data=request.data)
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
-        return Response(serializer.data,status=HTTP_200_OK)
+        serializer.save()
+        return Response(serializer.data, status=HTTP_200_OK)
+
+
+@extend_schema(tags=["User"])
+class SendCodeApiView(APIView):
+    serializer_class = SendSmsCodeSerializer
+    permission_classes = (AllowAny,)
+    authentication_classes = ()
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        code = random_code()
+        email = serializer.validated_data['email']
+
+        result = send_sms_code(email, code)
+        if not result["allowed"]:
+            return Response({
+                "message": f"{result['remain_seconds']} sekunddan so'ng yubora olasiz."
+            }, status=429)
+
+        send_mail(
+            f"{code}",
+            "This code is for verify your email .\n "
+            "if it's not you please check your accounts \n"
+            "and dont tell this code to others",
+            "makhliyoabboskhonova@gmail.com",
+            [email],
+        )
+
+        return Response({"message": "Send sms code"})
+
+
+@extend_schema(tags=["User"])
+class CheckCodeApiView(APIView):
+    serializer_class = CheckSmsCodeSerializer
+    authentication_classes = ()
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.get_data)
+
+
+@extend_schema(tags=["User"])
+class ChangeUserStatusAPIView(UpdateAPIView):
+    serializer_class=ChangeUserStatusSerializer
+
+    def get_queryset(self):
+        if not self.request.user.is_staff:
+            return Users.objects.filter(email=self.request.user.email)
+        elif self.request.user.is_staff:
+            return Users.objects.all()
+

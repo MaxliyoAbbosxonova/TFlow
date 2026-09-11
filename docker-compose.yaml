@@ -16,6 +16,20 @@ services:
       redis:
         condition: service_started
 
+  celery_worker:
+    build: .
+    container_name: tflow_celery_worker
+    command: celery -A root worker -l info
+    volumes:
+      - .:/app
+    env_file:
+      - env/.env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
   db:
     image: postgres:16
     container_name: tflow_db
@@ -47,3 +61,4 @@ volumes:
   postgres_data:
   redis_data:
   media_data:
+
