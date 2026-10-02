@@ -10,11 +10,11 @@ urlpatterns = [
     path('<int:pk>/projects', Project_by_Teams.as_view()),  # projects by teams
     path('<int:pk>/tasks', Tasks_by_Teams.as_view()),  # projects by teams
     path(
-        "team-members/<int:member_id>/teams/<int:team_id>/",
+        "team-members/<int:member_id>/teams/<int:pk>/",
         AddTeamMemberView.as_view()  # add member to team
     ),
     path(
-        "team-members/<int:member_id>/teams/<int:team_id>/remove/",
+        "team-members/<int:member_id>/teams/<int:pk>/remove/",
         RemoveTeamMemberView.as_view()  # remove member from team
     ),
 ]

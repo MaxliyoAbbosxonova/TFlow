@@ -8,7 +8,7 @@ from users.models import Users
 
 class Team(Model):
     name = CharField(max_length=100, unique=True)
-    workspace = ForeignKey('workspace.Workspace', related_name='team', on_delete=CASCADE, default=1)
+    workspace = ForeignKey('workspace.Workspace', related_name='teams', on_delete=CASCADE, default=1)
     team_lead = ForeignKey(Users, on_delete=RESTRICT, null=True)
 
     def __str__(self):

@@ -1,5 +1,6 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework.generics import ListAPIView
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
@@ -14,6 +15,7 @@ from notification.serializers import NotificationsModelSerializer, \
 @extend_schema(tags=['Notifications'])
 class NotificationListApiView(ListAPIView):
     serializer_class = NotificationsModelSerializer
+    pagination_class = LimitOffsetPagination
 
     def get_queryset(self):
         return Notification.objects.filter(recipient=self.request.user).all()
@@ -27,9 +29,9 @@ class NotificationReadApiView(APIView):
             context={'id': id}
         )
 
-        notification = serializer.save()
+        comment = serializer.save()
 
         return Response(
-            self.serializer_class(notification).data,
+            self.serializer_class(comment).data,
             status=HTTP_200_OK
         )

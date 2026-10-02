@@ -37,7 +37,7 @@ class WorkspaceMember(Model):
     role = CharField(max_length=15, choices=Role.choices, default=Role.EMPLOYEE)
 
     def __str__(self):
-        return self.role
+        return self.user.email
 
 
 class WorkspaceInvitation(Model):

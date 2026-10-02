@@ -36,12 +36,14 @@ AUTH_USER_MODEL = 'users.Users'
 # Application definition
 
 INSTALLED_APPS = [
+    "daphne",
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
     'users',
     'workspace',
     'shared',
@@ -51,13 +53,26 @@ INSTALLED_APPS = [
     'comment',
     'notification',
     'audit_log',
+    'realtime',
+
     'rest_framework',
     'drf_spectacular',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'mptt',
+    'django_filters',
+    "channels",
 
 ]
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {"hosts": [("redis", 6379)]},
+    }
+}
+
+ASGI_APPLICATION = "root.asgi.application"
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -158,9 +173,13 @@ MAILERS = {
 REST_FRAMEWORK = {
     # YOUR SETTINGS
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
+    ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
+    'PAGE_SIZE': 10,
+
 }
 
 SIMPLE_JWT = {
@@ -192,7 +211,4 @@ FRONTEND_URL = os.getenv('FRONTEND_URL')
 # eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzg5Nzk5MTI2LCJpYXQiOjE3ODcyMDcxMjYsImp0aSI6IjgzMjVjYjQxZWYxYjQ1MWI4YTlmMTJhNWUxY2U2ZDVhIiwidXNlcl9pZCI6IjIifQ.QWM3rPP25QNQOBjvruRj6X2MRCVsNPHDTKi2Yg3JF_o
 
 # mila admin
-# eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzkxMzY3NTM4LCJpYXQiOjE3ODg3NzU1MzgsImp0aSI6ImFkNjcwYjcxYzJhMTRiYzA4NWQ3NGNiYzcwZTcwZWJlIiwidXNlcl9pZCI6IjEifQ.KrXQV4O-FkjPtM353D4h6iJP_Jy3CUPK96d-gSOVZvs
-
-
-
+# eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzkyMjM3OTI4LCJpYXQiOjE3ODk2NDU5MjgsImp0aSI6Ijg4MzgzMTY4M2FlNTQ4Nzc4NzViZTQ4ODMyM2M4Y2Y4IiwidXNlcl9pZCI6IjEifQ.KEf008ED04f5cuoHPtBqJvLbupulHOc9UB34Iv_5BHA

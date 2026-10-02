@@ -3,6 +3,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import permissions, status
 from rest_framework.generics import GenericAPIView, UpdateAPIView
 from rest_framework.generics import ListAPIView, ListCreateAPIView
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAdminUser, AllowAny
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
@@ -16,6 +17,7 @@ from users.models import Users, Profile
 from users.serializers import UserModelSerializer, Register, ProfileModelSerializer, LoginSerializer, \
     RefreshTokenSerializer, PasswordResetSerializer, SendSmsCodeSerializer, CheckSmsCodeSerializer, \
     ChangeUserStatusSerializer
+from users.tasks import send_user_email
 
 
 # Create your views here.
@@ -25,6 +27,8 @@ class UsersListApiView(ListAPIView):
     queryset = Users.objects.all()
     serializer_class = UserModelSerializer
     permission_classes = [IsAdminUser, ]
+    pagination_class=LimitOffsetPagination
+
 
 
 @extend_schema(tags=['User'])
@@ -48,10 +52,14 @@ class RegisterApiView(APIView):
 @extend_schema(tags=['Profile'])
 class ProfileListApiView(ListCreateAPIView):
     serializer_class = ProfileModelSerializer
+    pagination_class=LimitOffsetPagination
+    permission_classes = (IsAdminUser,)
+
+
 
     def get_queryset(self):
-        if self.request.user.is_superuser:
             return Profile.objects.all()
+
 
 
 @extend_schema(tags=['Profile'])
@@ -116,7 +124,7 @@ class LogoutView(GenericAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class Password_Reset(APIView):
+class PasswordReset(APIView):
     serializer_class = PasswordResetSerializer
     permission_classes = (AllowAny,)
 
@@ -136,23 +144,15 @@ class SendCodeApiView(APIView):
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
-        code = random_code()
         email = serializer.validated_data['email']
 
-        result = send_sms_code(email, code)
+        result = send_sms_code(email)
         if not result["allowed"]:
             return Response({
                 "message": f"{result['remain_seconds']} sekunddan so'ng yubora olasiz."
             }, status=429)
 
-        send_mail(
-            f"{code}",
-            "This code is for verify your email .\n "
-            "if it's not you please check your accounts \n"
-            "and dont tell this code to others",
-            "makhliyoabboskhonova@gmail.com",
-            [email],
-        )
+        send_user_email(result,email)
 
         return Response({"message": "Send sms code"})
 
@@ -165,13 +165,13 @@ class CheckCodeApiView(APIView):
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.get_data)
+        return Response(data={"detail":"Kod tasdiqlandi"},status=HTTP_200_OK)
 
 
 @extend_schema(tags=["User"])
 class ChangeUserStatusAPIView(UpdateAPIView):
     serializer_class=ChangeUserStatusSerializer
+    permission_classes = (IsAdminUser,)
 
     def get_queryset(self):
         if not self.request.user.is_staff:

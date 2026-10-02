@@ -23,4 +23,6 @@ def create_invitation(validated_data):
         expires_at=timezone.now() + timedelta(days=7)
     )
     send_invitation_email_task.delay(invitation.id)
+    transaction.on_commit(lambda: send_invitation_email_task.delay(invitation.id))
+
     return invitation

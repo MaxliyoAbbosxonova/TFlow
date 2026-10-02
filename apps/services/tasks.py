@@ -1,9 +1,11 @@
+from realtime.utils import emit_to_project
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.exceptions import NotFound, ValidationError
 
 from services.audit import create_audit_log
 from services.workflow import validate_status, validate_subtask_done
-from task.models import Task
+from task.models import Task, Label
 from task.tasks import send_assignee_notification_task, send_status_notification_task
 from workspace.models import WorkspaceMember
 
@@ -29,17 +31,21 @@ def create_task(validated_data):
                          "priority": task.priority,
                          "deadline": str(task.deadline) if task.deadline else None,
                      })
-    send_assignee_notification_task(task)
+    # rollback bo'lsa notification yuborilmasligi uchun
+    transaction.on_commit(lambda: send_assignee_notification_task(task))
+
     return task
 
 
 
 @transaction.atomic
-def change_assignee(task_id, new_assignee):
-    member = WorkspaceMember.objects.filter(id=new_assignee).first()
+def change_assignee(task_id, new_assignee,changed_by:None):
     task = get_task_or_404(task_id)
+    member = WorkspaceMember.objects.filter(id=new_assignee,team=task.project.team).first()
     if not member:
-        raise ValidationError('Task not found')
+        raise ValidationError('assignee  is  not member')
+
+    old_assignee_id = task.assignee_id
 
     create_audit_log(
         actor=task.reporter,
@@ -50,7 +56,15 @@ def change_assignee(task_id, new_assignee):
     )
     task.assignee = member
     task.save(update_fields=['assignee'])
-    send_assignee_notification_task(task)
+    # rollback bo'lsa notification yuborilmasligi uchun
+    transaction.on_commit(lambda: send_assignee_notification_task(task))
+    if task.project_id:
+        emit_to_project(task.project_id, "task:assignee_changed", {
+            "task_id": task.id,
+            "old_assignee": old_assignee_id,  # WorkspaceMember id
+            "new_assignee": member.id,  # WorkspaceMember id
+            "changed_by": changed_by,  # User id
+        })
     return task
 
 
@@ -83,36 +97,53 @@ def change_deadline(task_id, deadline):
         actor=task.reporter,
         action='CHANGED DEADLINE',
         model=task,
-        old_value={"deadline": old_deadline},
-        new_value={"deadline": new_deadline},
+        old_value={"deadline": old_deadline.isoformat() if old_deadline else None},
+        new_value={"deadline": new_deadline.isoformat()},
     )
-    task.deadline = deadline
+    task.deadline = new_deadline
     task.save(update_fields=['deadline'])
     return task
 
 
 @transaction.atomic
-def change_status(task_id, status):
+def change_status(task_id, status, actor):
     task = get_task_or_404(task_id)
     old_status = task.status
     new_status = status
 
-    validate_status(current_status=task.status, new_status=status)
+    validate_status(current_status=old_status, new_status=new_status)
+    if not (task.deadline and task.assignee):
+        raise ValidationError("Deadline va Assignee majburiy maydonlar")
     if new_status == Task.Workflow.DONE:
         validate_subtask_done(task=task)
 
-    action = 'TASK ARCHIVED' if new_status == Task.Workflow.ARCHIVED else 'CHANGED STATUS'
+    task.status = new_status
+    if new_status == Task.Workflow.DONE:
+        if task.completed_at is None:
+            task.completed_at = timezone.now()
+    elif new_status != Task.Workflow.ARCHIVED:
+        task.completed_at = None
 
+    task.save(update_fields=['status', 'completed_at'])
+
+    action = 'TASK ARCHIVED' if new_status == Task.Workflow.ARCHIVED else 'CHANGED STATUS'
     create_audit_log(
-        actor=task.reporter,
+        actor=actor,
         action=action,
         model=task,
         old_value={"status": old_status},
         new_value={"status": new_status},
     )
-    task.status = new_status
-    task.save(update_fields=['status'])
-    send_status_notification_task(task)
+
+    # rollback bo'lsa notification yuborilmasligi uchun
+    transaction.on_commit(lambda: send_status_notification_task(task))
+    if task.project_id:
+        emit_to_project(task.project_id, "task:status_changed", {
+            "task_id": task.id,
+            "old_status": old_status,
+            "new_status": new_status,
+            "changed_by": actor.user_id if actor else None,
+        })
     return task
 
 
@@ -131,5 +162,22 @@ def delete_task(task_id):
         new_value={"status": new_status},
     )
     task.status = new_status
-    task.save(update_fields=['status'])
+    task.save(update_fields=['status', 'completed_at'])
     return task
+
+
+@transaction.atomic
+def attach_label(validated_data):
+    task_id = validated_data['task']
+    label_id = validated_data['label']
+
+    task = Task.objects.filter(id=task_id).first()
+    label = Label.objects.filter(id=label_id).first()
+    task.label.add(label)
+
+    return task
+
+@transaction.atomic
+def create_label(validated_data):
+    label=Label.objects.create(**validated_data)
+    return label

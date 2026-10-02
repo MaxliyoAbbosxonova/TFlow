@@ -1,17 +1,26 @@
 from django.db import transaction
 from rest_framework.serializers import ModelSerializer
 
-from project.serializers import ProjectSerializer
+from project.serializers import ProjectsForTeamsSerializer, ProjectsTasksModelSerializer
 from team.models import Team
 from workspace.models import WorkspaceMember
 
 
 class TeamsProjectsModelSerializer(ModelSerializer):
-    projects = ProjectSerializer(many=True)
+    projects = ProjectsForTeamsSerializer(many=True)
 
     class Meta:
         model = Team
         fields = ('id', 'projects')
+
+
+class TeamsTasksModelSerializer(ModelSerializer):
+    projects = ProjectsTasksModelSerializer(many=True)
+
+    class Meta:
+        model = Team
+        fields = ('id', 'projects')
+
 
 
 class TeamModelSerializer(ModelSerializer):

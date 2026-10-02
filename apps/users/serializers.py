@@ -1,5 +1,3 @@
-import re
-
 from django.utils.text import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -8,14 +6,14 @@ from rest_framework.serializers import Serializer, ModelSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.tokens import TokenError
 
-from shared.utils import check_sms_code
+from shared.utils import check_sms_code, is_verified
 from users.models import Users, Profile
 
 
 class UserModelSerializer(ModelSerializer):
     class Meta:
         model = Users
-        fields = ('id', 'email', 'phone', 'date_joined', 'profile','status')
+        fields = ('id', 'email', 'phone', 'date_joined', 'profile', 'status')
 
 
 class ProfileModelSerializer(ModelSerializer):
@@ -101,62 +99,24 @@ class RefreshTokenSerializer(serializers.Serializer):
 
 class PasswordResetSerializer(Serializer):
     email = EmailField()
-    old_pass = CharField(max_length=8)
     new_pass = CharField(max_length=8)
-
-    def validate(self, validated_data):
-        self.user = Users.objects.filter(email=validated_data['email']).first()
-
-        if not self.user.check_password(validated_data['old_pass']):
-            raise ValidationError("Parolni unuttingizmi")
-        if not self.user:
-            raise ValidationError("Bunday foydalanuvchi mavjud emas")
-        if validated_data["old_pass"] == validated_data['new_pass']:
-            raise ValidationError("Yangi parol eskisidan farq qilishi kerak")
-
-        validated_data['user'] = self.user
-
-        return validated_data
-
-    def save(self):
-        user = self.validated_data['user']
-        new = self.validated_data['new_pass']
-        user.set_password(new)
-        user.save(update_fields=['password'])
-
-        return user
-
-
-class SendSmsCodeSerializer(ModelSerializer):
-    email = EmailField()
-
-    class Meta:
-        model = Users
-        fields = ['email']
-
-class CheckSmsCodeSerializer(Serializer):
-    email = EmailField()
-    code = IntegerField()
-    password=CharField()
     token_class = RefreshToken
 
-
     def validate(self, validated_data):
-        email = validated_data.get('email')
-        code = validated_data.get('code')
-
-        if not check_sms_code(email, code):
-            raise ValidationError('Invalid code')
-
-        self.user = Users.objects.filter(email=validated_data['email']).first()
+        email = validated_data['email']
+        self.user = Users.objects.filter(email=email).first()
         if not self.user:
-            raise ValidationError('Code entered correct but user is not registered ')
+            raise ValidationError("Bunday foydalanuvchi mavjud emas")
+        validated_data['user'] = self.user
+        if not is_verified(email=email):
+            raise ValidationError("Tasdiqlanmadi !")
+
         return validated_data
 
     def save(self):
         email = self.validated_data['email']
-        password = self.validated_data['password']
-        user=Users.objects.filter(email=email).first()
+        password = self.validated_data['new_pass']
+        user = Users.objects.filter(email=email).first()
         user.set_password(password)
         user.save(update_fields=['password'])
 
@@ -175,7 +135,32 @@ class CheckSmsCodeSerializer(Serializer):
         return cls.token_class.for_user(user)
 
 
+class SendSmsCodeSerializer(ModelSerializer):
+    email = EmailField()
+
+    class Meta:
+        model = Users
+        fields = ['email']
+
+
+class CheckSmsCodeSerializer(Serializer):
+    email = EmailField()
+    code = IntegerField()
+
+    def validate(self, validated_data):
+        email = validated_data.get('email')
+        code = validated_data.get('code')
+
+        if not check_sms_code(email, code):
+            raise ValidationError('Invalid code')
+
+        self.user = Users.objects.filter(email=validated_data['email']).first()
+        if not self.user:
+            raise ValidationError('Code entered correct but user is not registered ')
+        return validated_data
+
+
 class ChangeUserStatusSerializer(ModelSerializer):
     class Meta:
-        model=Users
-        fields=("id",'status')
+        model = Users
+        fields = ("id", 'status')

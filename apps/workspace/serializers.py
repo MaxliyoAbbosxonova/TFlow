@@ -8,6 +8,7 @@ from rest_framework.fields import UUIDField, EmailField, CharField
 from rest_framework.serializers import ModelSerializer, Serializer
 
 from project.serializers import ProjectModelSerializer
+from team.serializers import TeamModelSerializer
 from users.models import Users, Profile
 from users.serializers import ProfileModelSerializer
 from workspace.models import WorkspaceMember, Workspace, WorkspaceInvitation
@@ -22,23 +23,25 @@ class WorkspaceMembersModelSerializers(ModelSerializer):
 class WorkspaceModelSerializer(ModelSerializer):
     class Meta:
         model = Workspace
-        fields = '__all__'
+        fields = ('name','description' ,'logo')
+
 
     def create(self, validated_data):
+        request=self.context['request']
+
         with transaction.atomic():
-            owner = validated_data.pop("owner")
 
             workspace = Workspace.objects.create(
-                owner=owner,
+                owner=request.user,
                 **validated_data
             )
 
             member = WorkspaceMember.objects.create(
-                user=owner,
+                user=request.user,
                 role=WorkspaceMember.Role.WORKSPACE_OWNER
             )
 
-            member.workspace.add(workspace)
+            member.workspace=workspace
 
             return workspace
 
@@ -57,6 +60,14 @@ class WorkspaceProjectsModelSerializer(ModelSerializer):
     class Meta:
         model = Workspace
         fields = ('id', 'products')
+
+
+class WorkspaceTeamsModelSerializer(ModelSerializer):
+    teams = TeamModelSerializer(many=True)
+
+    class Meta:
+        model = Workspace
+        fields = ('id', 'teams')
 
 
 class WorkspaceInvitationModelSerializer(ModelSerializer):

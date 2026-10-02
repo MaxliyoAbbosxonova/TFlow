@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.views import APIView
 
-from workspace.views import InvitationAcceptApiView
+from workspace.views import InvitationAcceptApiView, WorkspaceRetrieveLISTApiView, W_TeamsListApiView
 from workspace.views import WorkspaceListCreateApiView, WorkspaceRetrieveApiView, \
     W_MembersListApiView, W_MemberCreateApiView, \
     RemoveWorkspaceMemberView, W_ProjectsListApiView, \
@@ -9,10 +9,12 @@ from workspace.views import WorkspaceListCreateApiView, WorkspaceRetrieveApiView
 
 urlpatterns = [
     path('', WorkspaceListCreateApiView.as_view()),
+    path('list/user', WorkspaceRetrieveLISTApiView.as_view()),
     path('<int:pk>', WorkspaceRetrieveApiView.as_view()),
 
     path('<int:pk>/members', W_MembersListApiView.as_view()),  # members by workspace
     path('<int:pk>/projects', W_ProjectsListApiView.as_view()),  # projects by workspace
+    path('<int:pk>/teams', W_TeamsListApiView.as_view()),  # teams by workspace
 
     path('w_members/', W_MemberCreateApiView.as_view()),
 

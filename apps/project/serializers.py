@@ -24,3 +24,9 @@ class ProjectSerializer(ModelSerializer):
     class Meta:
         model = Project
         fields = ("id", 'title', 'tasks')
+
+class ProjectsForTeamsSerializer(ModelSerializer):
+
+    class Meta:
+        model = Project
+        fields = ("id", 'title')

@@ -1,11 +1,13 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView, get_object_or_404, RetrieveAPIView
+from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from shared.permissions import Projects_Tasks_Members
+from shared.permissions import Projects_Tasks_Members, IsOwnerManagerAdmin
 from team.models import Team
-from team.serializers import TeamModelSerializer, TeamsProjectsModelSerializer
+from team.serializers import TeamModelSerializer, TeamsProjectsModelSerializer, TeamsTasksModelSerializer
 from workspace.models import WorkspaceMember
 
 
@@ -17,24 +19,20 @@ from workspace.models import WorkspaceMember
 class TeamListCreateApiView(ListCreateAPIView):
     queryset = Team.objects.all()
     serializer_class = TeamModelSerializer
+    permission_classes = (IsAdminUser,)
+    pagination_class=LimitOffsetPagination
 
-    def has_permission(self, request):
-        if request.method == "GET":
-            return request.user.is_staff
-        elif request.method == "POST" or request.method == "PATCH" or request.method == "PUT":
-            if ((Team.workspace.owner or Team.team_lead) is WorkspaceMember.objects.filter(
-                    user=self.request.user)) or self.request.user.is_staff:
-                return True
-        return None
+
 
 
 # Bo'ldi v
 @extend_schema(tags=["Teams"])
 class AddTeamMemberView(APIView):
+    permission_classes = (IsOwnerManagerAdmin,)
 
-    def post(self, request, member_id, team_id):
+    def post(self, request, member_id, pk):
         member = get_object_or_404(WorkspaceMember, id=member_id)
-        team = get_object_or_404(Team, id=team_id)
+        team = get_object_or_404(Team, id=pk)
 
         if team.workspace_id != member.workspace_id:
             return Response(
@@ -49,19 +47,12 @@ class AddTeamMemberView(APIView):
 # Bo'ldi v
 @extend_schema(tags=["Teams"])
 class RemoveTeamMemberView(APIView):
+    permission_classes = (IsOwnerManagerAdmin,)
 
-    def has_permission(self, request):
-        if request.method == "GET":
-            return request.user.is_staff
-        elif request.method == "POST" or request.method == "PATCH" or request.method == "PUT":
-            if ((Team.workspace.owner or Team.team_lead) is WorkspaceMember.objects.filter(
-                    user=self.request.user)) or self.request.user.is_staff:
-                return True
-        return None
 
-    def delete(self, request, member_id, team_id):
+    def delete(self, request, member_id, pk):
         member = get_object_or_404(WorkspaceMember, id=member_id)
-        team = get_object_or_404(Team, id=team_id)
+        team = get_object_or_404(Team, id=pk)
 
         if team.workspace_id != member.workspace_id:
             return Response(
@@ -78,6 +69,7 @@ class RemoveTeamMemberView(APIView):
 class TeamUpdateDestroyApiView(RetrieveUpdateDestroyAPIView):
     queryset = Team.objects.all()
     serializer_class = TeamModelSerializer
+    permission_classes = (IsOwnerManagerAdmin,)
 
 
 @extend_schema(tags=["Teams"])
@@ -85,10 +77,15 @@ class Project_by_Teams(RetrieveAPIView):
     queryset = Team.objects.all()
     serializer_class = TeamsProjectsModelSerializer
     permission_classes = (Projects_Tasks_Members,)
+    pagination_class=LimitOffsetPagination
+
 
 
 @extend_schema(tags=["Teams"])
 class Tasks_by_Teams(RetrieveAPIView):
-    queryset = Team.objects.all()
-    serializer_class = TeamsProjectsModelSerializer
+    serializer_class = TeamsTasksModelSerializer
     permission_classes = (Projects_Tasks_Members,)
+
+    def get_queryset(self):
+        return Team.objects.filter()
+

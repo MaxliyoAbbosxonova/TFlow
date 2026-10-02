@@ -5,6 +5,7 @@ from random import randint
 
 import redis
 from rest_framework.fields import Field
+from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 
 
@@ -141,8 +142,8 @@ def _get_login_key(email):
     return f'login:{email}'
 
 
-def send_sms_code(email: str, code: int, ttl_seconds=120):
-    redis_key = f'login:{email}'
+def send_sms_code(email: str, ttl_seconds=500):
+    redis_key=_get_login_key(email=email)
     data = redis_client.hgetall(redis_key)
     if data:
         sent_at = float(data.get("sent_at"))
@@ -155,25 +156,52 @@ def send_sms_code(email: str, code: int, ttl_seconds=120):
                 "remain_seconds": round(remain)
 
             }
-    print(f"[TEST] Email: {email}, Code: {code}")
-    redis_client.hmset(redis_key, {
+    code = random_code()
+    redis_client.hset(redis_key, mapping={
         "sent_at": time.time(),
-        "code": code
-    })
+        "code": code,
+        "verified":"0",
+        'attempts':0
+    },)
     redis_client.expire(redis_key, ttl_seconds)
 
     return {
         "allowed": True,
-        "remain_seconds": 0
+        "remain_seconds": 0,
+        "code":code
     }
 
+MAX_ATTEMPTS=5
 
 def check_sms_code(email: str, code: int):
-    redis_key = f"login:{email}"
+    redis_key = _get_login_key(email)
     data = redis_client.hgetall(redis_key)
     if not data:
         return False
+    attempts = int(data.get("attempts"))
+    if attempts>=MAX_ATTEMPTS:
+        redis_client.delete(redis_key)
+        return False
     saved_code = data.get("code")
-    print(saved_code, code)
 
-    return str(saved_code) == str(code)
+    if str(saved_code) == str(code):
+        redis_client.hset(redis_key,"verified","1")
+        return True
+    else:
+        redis_client.hincrby(redis_key,"attempts",1)
+        return False
+
+
+def is_verified(email:str)-> bool :
+    redis_key=_get_login_key(email)
+    data=redis_client.hgetall(redis_key)
+    verified=data.get("verified","0")
+    return verified == "1"
+
+def clear_login_key(email:str):
+    redis_key=_get_login_key(email)
+    redis_client.delete(redis_key)
+
+
+
+

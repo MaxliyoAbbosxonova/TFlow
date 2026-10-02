@@ -15,7 +15,7 @@ class WorkspaceAdmin(ModelAdmin):
 
 @admin.register(WorkspaceMember)
 class WorkspaceMemberAdmin(ModelAdmin):
-    list_display = ('id', 'user', 'role')
+    list_display = ('id', 'user', 'role','workspace')
     list_display_links = ('id',)
 
 

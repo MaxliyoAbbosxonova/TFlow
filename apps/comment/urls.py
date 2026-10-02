@@ -4,8 +4,8 @@ from comment.views import   CommentsListApiView, CommentsCreateApiView, Comments
 
 
 urlpatterns=[
-    path('list/<int:pk>/', CommentsListApiView.as_view()),  # List task's comments
+    path('task_comments/<int:task_id>/', CommentsListApiView.as_view()),  # List task's comments
     path('create/', CommentsCreateApiView.as_view()),  # create comments
-    path('<int:pk>/', CommentsRetrieveUpdateDestroyApiView.as_view()),  # Crud comments
+    path('my_comments/<int:pk>/', CommentsRetrieveUpdateDestroyApiView.as_view()),  # Crud comments
 
 ]
