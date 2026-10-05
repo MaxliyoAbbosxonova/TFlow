@@ -1,3 +1,4 @@
+from project.models import Project
 from realtime.utils import emit_to_project
 from django.db import transaction
 from django.utils import timezone

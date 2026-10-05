@@ -2,6 +2,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.fields import IntegerField, ChoiceField, DateTimeField
 from rest_framework.serializers import ModelSerializer, ListSerializer, Serializer
 
+from project.models import Project
 from shared.utils import RecursiveField
 from task.models import Task, Label
 
@@ -31,6 +32,11 @@ class TaskModelSerializer(ModelSerializer):
             raise ValidationError(
                 {"parent": "Subtask parent taskning projectidan tashqarida bo'lishi mumkin emas."}
             )
+
+        project = Project.objects.filter(id=attrs['project']).first()
+        if project.status == Project.Status.ARCHIVED:
+            return ValidationError('You Can`t create task for ARCHIVED project ')
+
         return attrs
 
 class ChangeAssigneeSerializer(Serializer):
