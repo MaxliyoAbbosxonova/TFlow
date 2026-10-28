@@ -1,11 +1,10 @@
 from django.db import transaction
-
-from users.models import Users, Profile
+from users.models import Profile, Users
 from workspace.models import WorkspaceInvitation, WorkspaceMember
 
 
 @transaction.atomic
-def Invitation_Anonymouse_Accept(validated_data):
+def invitation_anonymous_accept(validated_data):
     email = validated_data['email']
     phone = validated_data['phone']
     token = validated_data.pop('token')
@@ -26,7 +25,7 @@ def Invitation_Anonymouse_Accept(validated_data):
 
 
 @transaction.atomic
-def Invitation_Accept(validated_data):
+def invitation_accept(validated_data):
     token = validated_data.pop('token')
     invitation = WorkspaceInvitation.objects.filter(token=token).first()
     user = Users.objects.filter(email=invitation.email).first()

@@ -8,41 +8,63 @@ from services.notification import send_notification
 from task.models import Task
 
 
+# optimisation
 @shared_task
 def notify_upcoming_deadlines():
     tomorrow = date.today() + timedelta(days=1)
+    task_ids = list(Task.objects.filter(deadline__date=tomorrow, status__in=['TODO', 'IN_PROGRESS'],
+                                        assignee__isnull=False, assignee__user__email__gt='').values_list('id',
+                                                                                                          flat=True))
+    if task_ids:
+        send_task_reminders.delay(task_ids)
 
-    tasks = Task.objects.filter(
-        deadline__date=tomorrow,
-        status__in=['TODO', 'IN_PROGRESS'],
-    ).select_related('assignee')
+    return f"{len(task_ids)} ta task uchun eslatma yuborildi"
 
-    for task in tasks:
-        if task.assignee and task.assignee.user.email:
-            send_task_reminder.delay(task.id)
-
-    return f"{tasks.count()} ta task uchun eslatma yuborildi"
 
 
 @shared_task(bind=True, max_retries=3)
-def send_task_reminder(self, task_id):
-    try:
-        task = Task.objects.select_related('assignee').get(id=task_id)
-        subject="Deadline yaqinlashmoqda"
-        message = f'"{task.title}" tasking deadline ertaga tugaydi.'
-        send_notification(
-            recipient=task.assignee.user,
-            title=subject,
-            message=message,
-            notification_type=Notification.NotificationType.DEADLINE_SOON
+def send_task_reminders(self, task_ids):
+    tasks = Task.objects.filter(
+        id__in=task_ids,
+        assignee__isnull=False,
+    ).select_related(
+        'assignee__user'
+    )
+
+    failed_ids = []
+
+    for task in tasks:
+        try:
+            user = task.assignee.user
+
+            if not user.email:
+                continue
+
+            subject = "Deadline yaqinlashmoqda"
+            message = f'"{task.title}" taskining deadline muddati ertaga tugaydi.'
+
+            send_notification(
+                recipient=user,
+                title=subject,
+                message=message,
+                notification_type=Notification.NotificationType.DEADLINE_SOON,
+            )
+
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email="makhliyoabboskhonova@gmail.com",
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+
+        except Exception:
+            failed_ids.append(task.id)
+
+    if failed_ids:
+        raise self.retry(
+            args=[failed_ids],
+            countdown=60,
         )
 
-        send_mail(
-            subject=subject,
-            message=message,
-            from_email="makhliyoabboskhonova@gmail.com",
-            recipient_list=[task.assignee.user.email],
-            fail_silently=False,
-        )
-    except Exception as exc:
-        raise self.retry(exc=exc, countdown=60)
+    return f"{len(task_ids)} ta task qayta ishlandi"

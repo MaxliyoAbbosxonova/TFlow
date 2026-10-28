@@ -1,11 +1,16 @@
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import DateTimeField, SET_NULL, PositiveBigIntegerField, JSONField
-from django.db.models import Model, CASCADE, ForeignKey
+from django.db.models import (
+    CASCADE,
+    SET_NULL,
+    DateTimeField,
+    ForeignKey,
+    JSONField,
+    Model,
+    PositiveBigIntegerField,
+)
 from django.db.models.fields import CharField
-
 from workspace.models import WorkspaceMember
-
 
 # Create your models here.
 

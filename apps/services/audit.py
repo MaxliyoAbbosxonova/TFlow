@@ -1,6 +1,5 @@
-from django.contrib.contenttypes.models import ContentType
-
 from audit_log.models import AuditLog
+from django.contrib.contenttypes.models import ContentType
 
 
 def create_audit_log(actor, action, model, old_value=None, new_value=None):

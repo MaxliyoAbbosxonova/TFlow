@@ -9,6 +9,6 @@ __pycache__/
 .env
 env/.env
 db.sqlite3
-dbb.sqlite3
+
 .pytest_cache/
 .mypy_cache/

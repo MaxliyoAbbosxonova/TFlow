@@ -1,7 +1,6 @@
 from django.db import transaction
-from rest_framework.serializers import ModelSerializer
-
 from project.serializers import ProjectsForTeamsSerializer, ProjectsTasksModelSerializer
+from rest_framework.serializers import ModelSerializer
 from team.models import Team
 from workspace.models import WorkspaceMember
 
@@ -20,7 +19,6 @@ class TeamsTasksModelSerializer(ModelSerializer):
     class Meta:
         model = Team
         fields = ('id', 'projects')
-
 
 
 class TeamModelSerializer(ModelSerializer):

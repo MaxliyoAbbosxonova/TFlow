@@ -1,12 +1,16 @@
-from django.db.models import DateTimeField, BooleanField
-from django.db.models import Model, CASCADE, TextChoices, \
-    TextField, ForeignKey
-from django.db.models.fields import CharField
-
 from comment.models import Comments
+from django.db.models import (
+    CASCADE,
+    BooleanField,
+    DateTimeField,
+    ForeignKey,
+    Model,
+    TextChoices,
+    TextField,
+)
+from django.db.models.fields import CharField
 from task.models import Task
 from users.models import Users
-
 
 # Create your models here.
 

@@ -1,13 +1,18 @@
 import uuid
 
-from django.db.models import ImageField
-from django.db.models import Model, ManyToManyField, CASCADE, TextChoices, \
-    TextField, ForeignKey, RESTRICT
-from django.db.models.fields import CharField, EmailField, DateTimeField, UUIDField
+from django.db.models import (
+    CASCADE,
+    RESTRICT,
+    ForeignKey,
+    ImageField,
+    ManyToManyField,
+    Model,
+    TextChoices,
+    TextField,
+)
+from django.db.models.fields import CharField, DateTimeField, EmailField, UUIDField
 from django.utils import timezone
-
 from users.models import Users
-
 
 # Create your models here.
 

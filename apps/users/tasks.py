@@ -3,7 +3,7 @@ from django.core.mail import send_mail
 
 
 @shared_task
-def send_user_email(result,email):
+def send_user_email(result, email):
     send_mail(
         f"{result['code']}",
         "This code is for verify your email .\n "
@@ -12,4 +12,3 @@ def send_user_email(result,email):
         "makhliyoabboskhonova@gmail.com",
         [email],
     )
-

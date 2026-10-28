@@ -1,11 +1,12 @@
 from django.urls import path
-
-from project.views import ProjectCreateApiView, ProjectRetrieveUpdateDestroyApiView, \
-    Tasks_by_Project
+from project.views import (
+    ProjectCreateApiView,
+    ProjectRetrieveUpdateDestroyApiView,
+    TasksByProject,
+)
 
 urlpatterns = [
-    path('<int:pk>/tasks', Tasks_by_Project.as_view()),  # tasks_by projects
-    path('', ProjectCreateApiView.as_view()),  # projects list
-    path('<int:pk>/', ProjectRetrieveUpdateDestroyApiView.as_view()),  # Projects CRUD
-
+    path('<int:pk>/tasks', TasksByProject.as_view(), name='project-tasks'),
+    path('', ProjectCreateApiView.as_view(), name='project-create'),
+    path('<int:pk>/', ProjectRetrieveUpdateDestroyApiView.as_view(), name='project-detail'),
 ]

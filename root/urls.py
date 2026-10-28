@@ -16,23 +16,27 @@ Including another URLconf
 """
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import path, include
-from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
-
-from root.settings import MEDIA_URL, MEDIA_ROOT
+from django.urls import include, path
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
+)
 from users.views import TokenRefreshView
+
+from root.settings import MEDIA_ROOT, MEDIA_URL
 
 urlpatterns = [
                   path('admin/', admin.site.urls),
                   path('auth/', include('users.urls')),
-                  path('workspaces/',include('workspace.urls')),
-                  path('tasks/',include('task.urls')),
-                  path('teams/',include('team.urls')),
-                  path('projects/',include('project.urls')),
-                  path('comments/',include('comment.urls')),
-                  path('notifications/',include('notification.urls')),
-                  path('audit_logs/',include('audit_log.urls')),
-                  path('files/',include('shared.urls')),
+                  path('workspaces/', include('workspace.urls')),
+                  path('tasks/', include('task.urls')),
+                  path('teams/', include('team.urls')),
+                  path('projects/', include('project.urls')),
+                  path('comments/', include('comment.urls')),
+                  path('notifications/', include('notification.urls')),
+                  path('audit_logs/', include('audit_log.urls')),
+                  path('files/', include('shared.urls')),
                   path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
                   # Optional UI:
                   path('', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),

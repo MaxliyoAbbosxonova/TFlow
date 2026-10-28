@@ -1,30 +1,44 @@
-from project.models import Project
-from realtime.utils import emit_to_project
 from django.db import transaction
 from django.utils import timezone
+from realtime.utils import emit_to_project
+from rest_framework import status
 from rest_framework.exceptions import NotFound, ValidationError
-
 from services.audit import create_audit_log
 from services.workflow import validate_status, validate_subtask_done
-from task.models import Task, Label
+from task.models import Label, Task
 from task.tasks import send_assignee_notification_task, send_status_notification_task
 from workspace.models import WorkspaceMember
 
 
-def get_task_or_404(task_id):
-    task = Task.objects.filter(id=task_id).first()
+def get_task_or_404(task_id, for_update=False):
+    qs = Task.objects.select_for_update() if for_update else Task.objects
+    task = qs.filter(id=task_id).first()
     if not task:
         raise NotFound('Task not found')
     return task
 
 
 def format_member(member):
-    return f"ID-{member.user.id} -- {member.user.profile.first_name} {member.user.profile.last_name}"
+    if member is None:
+        return None
+    user = member.user
+    profile = getattr(user, "profile", None)
+    if profile is None:
+        return f"ID-{user.id} -- {user.email}"
+    return f"ID-{user.id} -- {profile.first_name} {profile.last_name}"
 
 
 @transaction.atomic
-def create_task(validated_data):
-    task=Task.objects.create(**validated_data)
+def create_task(validated_data, request):
+    member = WorkspaceMember.objects.filter(user=request.user, workspace=validated_data['project'].workspace)
+    if not member.exists():
+        raise ValidationError("You can't create task on other workspace project", code=status.HTTP_400_BAD_REQUEST)
+
+    task = Task.objects.create(reporter=member.first(), **validated_data)
+    if not (task.project.workspace.members.filter(user=request.user,
+                                                  role=WorkspaceMember.Role.MANAGER).exists() or task.project.team.team_lead == request.user):
+        raise ValidationError('You don`t have permissions for this action')
+
     create_audit_log(actor=task.reporter, action='CREATE',
                      model=task,
                      new_value={
@@ -33,24 +47,25 @@ def create_task(validated_data):
                          "deadline": str(task.deadline) if task.deadline else None,
                      })
     # rollback bo'lsa notification yuborilmasligi uchun
-    transaction.on_commit(lambda: send_assignee_notification_task(task))
+    transaction.on_commit(lambda: send_assignee_notification_task.delay(task.id))
 
     return task
 
 
-
 @transaction.atomic
-def change_assignee(task_id, new_assignee,changed_by:None):
-    task = get_task_or_404(task_id)
-    member = WorkspaceMember.objects.filter(id=new_assignee,team=task.project.team).first()
+def change_assignee(task_id, new_assignee, changed_by: None):
+    task = get_task_or_404(task_id, for_update=True)
+    member = WorkspaceMember.objects.filter(id=new_assignee, team=task.project.team).first()
+    actor=WorkspaceMember.objects.filter(id=changed_by).first()
     if not member:
         raise ValidationError('assignee  is  not member')
 
     old_assignee_id = task.assignee_id
 
     create_audit_log(
-        actor=task.reporter,
+        actor=actor,
         action='CHANGED ASSIGNEE',
+
         model=task,
         old_value={"assignee": format_member(task.assignee)},
         new_value={"assignee": format_member(member)},
@@ -58,7 +73,7 @@ def change_assignee(task_id, new_assignee,changed_by:None):
     task.assignee = member
     task.save(update_fields=['assignee'])
     # rollback bo'lsa notification yuborilmasligi uchun
-    transaction.on_commit(lambda: send_assignee_notification_task(task))
+    transaction.on_commit(lambda: send_assignee_notification_task.delay(task.id))
     if task.project_id:
         emit_to_project(task.project_id, "task:assignee_changed", {
             "task_id": task.id,
@@ -70,13 +85,14 @@ def change_assignee(task_id, new_assignee,changed_by:None):
 
 
 @transaction.atomic
-def change_priority(task_id, priority):
-    task = get_task_or_404(task_id)
+def change_priority(task_id, priority,user_id):
+    task = get_task_or_404(task_id, for_update=True)
     old_priority = task.priority
     new_priority = priority
+    actor=WorkspaceMember.objects.filter(id=user_id).first()
 
     create_audit_log(
-        actor=task.reporter,
+        actor=actor,
         action='CHANGED PRIORITY',
         model=task,
         old_value={"priority": old_priority},
@@ -88,14 +104,16 @@ def change_priority(task_id, priority):
 
 
 @transaction.atomic
-def change_deadline(task_id, deadline):
-    task = get_task_or_404(task_id)
+def change_deadline(task_id, deadline,user_id):
+    task = get_task_or_404(task_id, for_update=True)
     old_deadline = task.deadline
     new_deadline = deadline
     task.deadline = deadline
+    actor=WorkspaceMember.objects.filter(id=user_id).first()
+
 
     create_audit_log(
-        actor=task.reporter,
+        actor=actor,
         action='CHANGED DEADLINE',
         model=task,
         old_value={"deadline": old_deadline.isoformat() if old_deadline else None},
@@ -108,9 +126,10 @@ def change_deadline(task_id, deadline):
 
 @transaction.atomic
 def change_status(task_id, status, actor):
-    task = get_task_or_404(task_id)
+    task = get_task_or_404(task_id, for_update=True)
     old_status = task.status
     new_status = status
+
 
     validate_status(current_status=old_status, new_status=new_status)
     if not (task.deadline and task.assignee):
@@ -137,7 +156,7 @@ def change_status(task_id, status, actor):
     )
 
     # rollback bo'lsa notification yuborilmasligi uchun
-    transaction.on_commit(lambda: send_status_notification_task(task))
+    transaction.on_commit(lambda: send_status_notification_task.delay(task.id))
     if task.project_id:
         emit_to_project(task.project_id, "task:status_changed", {
             "task_id": task.id,
@@ -149,14 +168,16 @@ def change_status(task_id, status, actor):
 
 
 @transaction.atomic
-def delete_task(task_id):
-    task = get_task_or_404(task_id)
+def delete_task(task_id,user_id):
+    task = get_task_or_404(task_id, for_update=True)
     old_status = task.status
     new_status = Task.Workflow.ARCHIVED
     action = 'TASK ARCHIVED'
-
+    actor=WorkspaceMember.objects.filter(id=user_id).first()
+    if old_status == Task.Workflow.ARCHIVED:
+        raise ValidationError('Task already archived !', code=status.HTTP_400_BAD_REQUEST)
     create_audit_log(
-        actor=task.reporter,
+        actor=actor,
         action=action,
         model=task,
         old_value={"status": old_status},
@@ -178,7 +199,8 @@ def attach_label(validated_data):
 
     return task
 
+
 @transaction.atomic
 def create_label(validated_data):
-    label=Label.objects.create(**validated_data)
+    label = Label.objects.create(**validated_data)
     return label

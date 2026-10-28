@@ -1,6 +1,6 @@
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser
-from django.db.models import CharField, Model, ImageField, CASCADE, OneToOneField
+from django.db.models import CASCADE, CharField, ImageField, Model, OneToOneField
 from django.db.models.enums import TextChoices
 from django.db.models.fields import DateTimeField, EmailField, TextField
 from django.utils import timezone
@@ -34,7 +34,6 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_active", True)
-
 
         if extra_fields.get("is_staff") is not True:
             raise ValueError("Superuser is_staff=True bo'lishi kerak")
@@ -89,7 +88,7 @@ class Users(AbstractUser):
     phone = CharField(max_length=14, default=901234567)
     date_joined = DateTimeField(default=timezone.now)
     objects = UserManager()
-    status=CharField(max_length=15,choices=Status.choices,default=Status.ACTIVE)
+    status = CharField(max_length=15, choices=Status.choices, default=Status.ACTIVE)
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["phone"]
 

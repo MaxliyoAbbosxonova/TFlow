@@ -9,7 +9,7 @@ venv/
 ENV/
 env/.env/
 .venv/
-
+_trial_temp/
 **/migrations/**
 !**/migrations/__init__.py
 # Jupyter notebook

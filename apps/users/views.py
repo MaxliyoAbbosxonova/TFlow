@@ -1,24 +1,34 @@
-from django.core.mail import send_mail
 from drf_spectacular.utils import extend_schema
 from rest_framework import permissions, status
-from rest_framework.generics import GenericAPIView, UpdateAPIView
-from rest_framework.generics import ListAPIView, ListCreateAPIView
+from rest_framework.exceptions import NotFound
+from rest_framework.generics import (
+    GenericAPIView,
+    ListAPIView,
+    ListCreateAPIView,
+    UpdateAPIView,
+)
 from rest_framework.pagination import LimitOffsetPagination
-from rest_framework.permissions import IsAdminUser, AllowAny
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenViewBase
-
-from shared.utils import random_code, send_sms_code
-from users.models import Users, Profile
-from users.serializers import UserModelSerializer, Register, ProfileModelSerializer, LoginSerializer, \
-    RefreshTokenSerializer, PasswordResetSerializer, SendSmsCodeSerializer, CheckSmsCodeSerializer, \
-    ChangeUserStatusSerializer
+from shared.utils import send_sms_code
+from users.models import Profile, Users
+from users.serializers import (
+    ChangeUserStatusSerializer,
+    CheckSmsCodeSerializer,
+    LoginSerializer,
+    PasswordResetSerializer,
+    ProfileModelSerializer,
+    RefreshTokenSerializer,
+    Register,
+    SendSmsCodeSerializer,
+    UserModelSerializer,
+)
 from users.tasks import send_user_email
-
 
 # Create your views here.
 
@@ -27,8 +37,7 @@ class UsersListApiView(ListAPIView):
     queryset = Users.objects.all()
     serializer_class = UserModelSerializer
     permission_classes = [IsAdminUser, ]
-    pagination_class=LimitOffsetPagination
-
+    pagination_class = LimitOffsetPagination
 
 
 @extend_schema(tags=['User'])
@@ -52,30 +61,28 @@ class RegisterApiView(APIView):
 @extend_schema(tags=['Profile'])
 class ProfileListApiView(ListCreateAPIView):
     serializer_class = ProfileModelSerializer
-    pagination_class=LimitOffsetPagination
+    pagination_class = LimitOffsetPagination
     permission_classes = (IsAdminUser,)
 
-
-
     def get_queryset(self):
-            return Profile.objects.all()
-
+        return Profile.objects.all()
 
 
 @extend_schema(tags=['Profile'])
 class ProfileListUpdateApiView(APIView):
     serializer_class = ProfileModelSerializer
-    permission_classes = (AllowAny,)
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         profile = request.user.profile
-
-        serializer = self.serializer_class(profile)
-
-        return Response(serializer.data)
+        if profile is None:
+            raise NotFound("Profil topilmadi")
+        return Response(self.serializer_class(profile).data)
 
     def patch(self, request):
         profile = request.user.profile
+        if profile is None:
+            raise NotFound("Profil topilmadi")
 
         serializer = self.serializer_class(
             profile,
@@ -152,7 +159,7 @@ class SendCodeApiView(APIView):
                 "message": f"{result['remain_seconds']} sekunddan so'ng yubora olasiz."
             }, status=429)
 
-        send_user_email(result,email)
+        send_user_email.delay(result, email)
 
         return Response({"message": "Send sms code"})
 
@@ -165,12 +172,12 @@ class CheckCodeApiView(APIView):
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
-        return Response(data={"detail":"Kod tasdiqlandi"},status=HTTP_200_OK)
+        return Response(data={"detail": "Kod tasdiqlandi"}, status=HTTP_200_OK)
 
 
 @extend_schema(tags=["User"])
 class ChangeUserStatusAPIView(UpdateAPIView):
-    serializer_class=ChangeUserStatusSerializer
+    serializer_class = ChangeUserStatusSerializer
     permission_classes = (IsAdminUser,)
 
     def get_queryset(self):
@@ -178,4 +185,3 @@ class ChangeUserStatusAPIView(UpdateAPIView):
             return Users.objects.filter(email=self.request.user.email)
         elif self.request.user.is_staff:
             return Users.objects.all()
-

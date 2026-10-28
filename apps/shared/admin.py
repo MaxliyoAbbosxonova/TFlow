@@ -1,8 +1,6 @@
 from django.contrib import admin
 from django.contrib.admin import ModelAdmin
-
 from shared.models import FileUpload
-
 
 # Register your models here.
 

@@ -1,47 +1,43 @@
 import re
 
-from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
-from rest_framework.fields import UUIDField, EmailField, CharField
+from rest_framework.fields import CharField, EmailField, UUIDField
 from rest_framework.serializers import ModelSerializer, Serializer
 
 from project.serializers import ProjectModelSerializer
 from team.serializers import TeamModelSerializer
-from users.models import Users, Profile
-from users.serializers import ProfileModelSerializer
-from workspace.models import WorkspaceMember, Workspace, WorkspaceInvitation
+from users.serializers import ProfileModelSerializer, UserListForWorkspaceMembers
+from workspace.models import Workspace, WorkspaceInvitation, WorkspaceMember
 
 
 class WorkspaceMembersModelSerializers(ModelSerializer):
+    user=UserListForWorkspaceMembers()
     class Meta:
         model = WorkspaceMember
-        fields = '__all__'
+        fields = ('team','user','role')
 
 
 class WorkspaceModelSerializer(ModelSerializer):
     class Meta:
         model = Workspace
-        fields = ('name','description' ,'logo')
-
+        fields = ('name', 'description', 'logo')
 
     def create(self, validated_data):
-        request=self.context['request']
+        request = self.context['request']
 
         with transaction.atomic():
-
             workspace = Workspace.objects.create(
                 owner=request.user,
                 **validated_data
             )
 
-            member = WorkspaceMember.objects.create(
+            WorkspaceMember.objects.create(
                 user=request.user,
-                role=WorkspaceMember.Role.WORKSPACE_OWNER
+                workspace=workspace,
+                role=WorkspaceMember.Role.WORKSPACE_OWNER,
             )
-
-            member.workspace=workspace
 
             return workspace
 
@@ -91,14 +87,14 @@ class CheckTokenSerializer(Serializer):
     def validate(self, validated_data):
         token = validated_data['token']
         invitation = WorkspaceInvitation.objects.filter(token=token).first()
-        workspace = Workspace.objects.filter(id=invitation.workspace.id).first()
         if not invitation:
             raise ValidationError(" Bunday Taklif havolasi mavjud emas ")
         if invitation.expires_at <= timezone.now():
             raise ValidationError(" Tokenning muddati o'tgan ")
         if invitation.status != WorkspaceInvitation.Status.PENDING:
             raise ValidationError('Token yaroqsiz ')
-        validated_data['workspace'] = workspace.id
+
+        validated_data['workspace'] = invitation.workspace.id
         validated_data['invited_by'] = invitation.invited_by.id
         validated_data['role'] = invitation.role
         validated_data['invitation'] = invitation.id
@@ -135,17 +131,8 @@ class InvitationAnonymousAcceptModelSerializer(Serializer):
         return validated_data
 
 
-
-
 class InvitationAcceptModelSerializer(Serializer):
     token = UUIDField(required=True)
-
-    def validate_phone(self, validated_data):
-        digits = re.findall(r'\d', validated_data)
-        if len(digits) < 9:
-            raise ValidationError('Phone number must be at least 9 digits')
-        phone = ''.join(digits)
-        return phone.removeprefix('998')
 
     def validate(self, validated_data):
         token = validated_data['token']
@@ -161,5 +148,3 @@ class InvitationAcceptModelSerializer(Serializer):
             raise ValidationError('Email mos kelmadi')
 
         return validated_data
-
-    

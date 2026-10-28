@@ -27,17 +27,15 @@ class ProjectConsumer(AsyncJsonWebsocketConsumer):
         if hasattr(self, "group_name"):
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
 
-    # receive_json ATAYLAB yo'q: client guruhga xabar yubora olmaydi.
-    # Eventlarni faqat server (view) yuboradi.
+
 
     async def project_event(self, event):
         await self.send_json(event["data"])
 
     @database_sync_to_async
     def has_access(self, user_id, project_id):
-        from project.models import Project  # yo'lni moslang
-        from workspace.models import WorkspaceMember  # yo'lni moslang
-
+        from project.models import Project
+        from workspace.models import WorkspaceMember
         project = (
             Project.objects
             .select_related("workspace", "member", "team")

@@ -1,5 +1,4 @@
 from django.urls import path
-
 from realtime.consumers import ProjectConsumer
 
 websocket_urlpatterns = [

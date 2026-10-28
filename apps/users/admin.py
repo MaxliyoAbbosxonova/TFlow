@@ -2,9 +2,7 @@ from django.contrib import admin
 from django.contrib.admin import ModelAdmin
 from django.contrib.auth.admin import UserAdmin
 from django.utils.safestring import mark_safe
-
-from users.models import Users, Profile
-
+from users.models import Profile, Users
 
 # Register your models here.
 
@@ -65,7 +63,8 @@ class UsersAdmin(UserAdmin):
 @admin.register(Profile)
 class Profile(ModelAdmin):
     list_display = ('username', 'first_name', 'last_name', 'birth', 'created_at', 'image_tag')
-    list_display_links =( 'username','image_tag')
+    list_display_links = ('username', 'image_tag')
+
     def image_tag(self, obj):
         if obj.image:
             return mark_safe(

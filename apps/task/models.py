@@ -1,28 +1,32 @@
 from django.core.exceptions import ValidationError
-from django.db.models import DateTimeField, Model
-from django.db.models import ManyToManyField, CASCADE, TextChoices, \
-    TextField, ForeignKey, RESTRICT
+from django.db.models import (
+    CASCADE,
+    RESTRICT,
+    SET_NULL,
+    DateTimeField,
+    ForeignKey,
+    ManyToManyField,
+    Model,
+    TextChoices,
+    TextField,
+)
 from django.db.models.fields import CharField
 from mptt.fields import TreeForeignKey
 from mptt.models import MPTTModel
-
 from project.models import Project
 from shared.models import FileUpload
-from workspace.models import WorkspaceMember, Workspace
-
+from workspace.models import Workspace, WorkspaceMember
 
 # Create your models here.
 
 
-
 class Label(Model):
     name = CharField(max_length=100)
-    color=CharField(max_length=7, default="#000000")
-    workspace=ForeignKey(Workspace,on_delete=CASCADE)
+    color = CharField(max_length=7, default="#000000")
+    workspace = ForeignKey(Workspace, on_delete=CASCADE)
 
     def __str__(self):
         return self.name
-
 
 
 class Task(MPTTModel):
@@ -48,21 +52,20 @@ class Task(MPTTModel):
     priority = CharField(max_length=10, choices=Priority.choices, default=Priority.LOW)
     deadline = DateTimeField(null=True, blank=True)
     status = CharField(max_length=15, choices=Workflow.choices, default=Workflow.TODO)
-    file = ForeignKey(FileUpload, on_delete=CASCADE, null=True, blank=True)
+    file = ForeignKey(FileUpload, on_delete=SET_NULL, null=True, blank=True)
     project = ForeignKey(Project, on_delete=CASCADE, null=True, related_name='tasks')
     label = ManyToManyField(Label, related_name="tasks")
-    created_at=DateTimeField(auto_now_add=True,)
-    completed_at =DateTimeField(null=True, blank=True)
+    created_at = DateTimeField(auto_now_add=True, )
+    completed_at = DateTimeField(null=True, blank=True)
 
     class MPTTMeta:
         order_insertion_by = ['title']
 
     def clean(self):
         super().clean()
-        if self.parent.id and self.parent.project_id != self.project_id:
+        if self.parent_id and self.parent.project_id != self.project_id:
             raise ValidationError(
-                {"parent": "Subtask parent taskning projectidan tashqarida bo'lishi mumkin emas."}
-            )
+                {"parent": "Subtask parent taskning projectidan tashqarida bo'lishi mumkin emas."})
 
     def save(self, *args, **kwargs):
         self.full_clean()  # admin/serializerdan tashqarida ham tekshirilishi uchun
@@ -70,4 +73,3 @@ class Task(MPTTModel):
 
     def __str__(self):
         return self.title
-

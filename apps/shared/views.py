@@ -1,13 +1,22 @@
-from rest_framework import status
-from rest_framework import viewsets
+from django.db.models import Avg, Count, DurationField, ExpressionWrapper, F, Q
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from drf_spectacular.utils import extend_schema
+from project.models import Project
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from rest_framework.views import APIView
+from task.models import Task
+
+from root import settings
 
 from .models import FileUpload
 from .permissions import IsProjectWorkspaceMember
-from .serializers import MultipleFileUploadSerializer, FileUploadSerializer
+from .serializers import FileUploadSerializer, MultipleFileUploadSerializer
 
 
 class MultipleFileUploadView(APIView):
@@ -52,18 +61,6 @@ class FileUploadViewSet(viewsets.ModelViewSet):
         return Response(FileUploadSerializer(track).data)
 
 
-from django.db.models import Avg, Count, DurationField, ExpressionWrapper, F, Q
-from django.shortcuts import get_object_or_404
-from django.utils import timezone
-from drf_spectacular.utils import extend_schema
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework.views import APIView
-
-# O'zingizning modellaringizga moslang:
-from project.models import Project
-from task.models import Task
-
 ONE = 'done'  # Task.status ichidagi "tugallangan" qiymati
 
 
@@ -76,13 +73,27 @@ COMPLETION_TIME = ExpressionWrapper(
     F('completed_at') - F('created_at'), output_field=DurationField()
 )
 
+from django.core.cache import cache
+
 
 @extend_schema(tags=['Statistics'])
 class ProjectStatisticsApiView(APIView):
     permission_classes = (IsAuthenticated, IsProjectWorkspaceMember,)
 
     def get(self, request, pk):
+        key = f"stats:project:{pk}"
+
+        data = cache.get(key)
+        if data is not None:
+            return Response(data)
+
         project = get_object_or_404(Project, pk=pk)
+        data = self._build_stats(project)
+
+        cache.set(key, data, timeout=settings.STATS_CACHE_TTL)
+        return Response(data)
+
+    def _build_stats(self, project):
         now = timezone.now()
         tasks = Task.objects.filter(project=project)
         overdue_q = Q(deadline__lt=now) & ~Q(status=Task.Workflow.DONE)
@@ -100,7 +111,7 @@ class ProjectStatisticsApiView(APIView):
         # 5: priority bo'yicha
         by_priority = tasks.values('priority').annotate(count=Count('id')).order_by('priority')
 
-        # 6 + 8: har bir employee bo'yicha (team performance ham shu yerdan)
+        # 6 + 8: har bir employee bo'yicha
         per_employee = (
             tasks.values('assignee_id', 'assignee__user__email')
             .annotate(
@@ -130,7 +141,7 @@ class ProjectStatisticsApiView(APIView):
         )['avg']
 
         total = totals['total']
-        return Response({
+        return {
             'project': project.pk,
             'total_tasks': total,
             'completed_tasks': totals['completed'],
@@ -144,4 +155,4 @@ class ProjectStatisticsApiView(APIView):
                 'top_performer': employees[0] if employees else None,
                 'members_count': len(employees),
             },
-        })
+        }

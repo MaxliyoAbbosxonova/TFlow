@@ -1,15 +1,22 @@
 from drf_spectacular.utils import extend_schema
-from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView, get_object_or_404, RetrieveAPIView
+from rest_framework.generics import (
+    ListCreateAPIView,
+    RetrieveAPIView,
+    RetrieveUpdateDestroyAPIView,
+    get_object_or_404,
+)
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
-from shared.permissions import Projects_Tasks_Members, IsOwnerManagerAdmin
+from shared.permissions import IsOwnerManagerAdmin, ProjectsTasksMembers
 from team.models import Team
-from team.serializers import TeamModelSerializer, TeamsProjectsModelSerializer, TeamsTasksModelSerializer
+from team.serializers import (
+    TeamModelSerializer,
+    TeamsProjectsModelSerializer,
+    TeamsTasksModelSerializer,
+)
 from workspace.models import WorkspaceMember
-
 
 # Create your views here.
 
@@ -20,9 +27,7 @@ class TeamListCreateApiView(ListCreateAPIView):
     queryset = Team.objects.all()
     serializer_class = TeamModelSerializer
     permission_classes = (IsAdminUser,)
-    pagination_class=LimitOffsetPagination
-
-
+    pagination_class = LimitOffsetPagination
 
 
 # Bo'ldi v
@@ -49,7 +54,6 @@ class AddTeamMemberView(APIView):
 class RemoveTeamMemberView(APIView):
     permission_classes = (IsOwnerManagerAdmin,)
 
-
     def delete(self, request, member_id, pk):
         member = get_object_or_404(WorkspaceMember, id=member_id)
         team = get_object_or_404(Team, id=pk)
@@ -73,19 +77,17 @@ class TeamUpdateDestroyApiView(RetrieveUpdateDestroyAPIView):
 
 
 @extend_schema(tags=["Teams"])
-class Project_by_Teams(RetrieveAPIView):
+class ProjectByTeams(RetrieveAPIView):
     queryset = Team.objects.all()
     serializer_class = TeamsProjectsModelSerializer
-    permission_classes = (Projects_Tasks_Members,)
-    pagination_class=LimitOffsetPagination
-
+    permission_classes = (ProjectsTasksMembers,)
+    pagination_class = LimitOffsetPagination
 
 
 @extend_schema(tags=["Teams"])
-class Tasks_by_Teams(RetrieveAPIView):
+class TasksByTeams(RetrieveAPIView):
     serializer_class = TeamsTasksModelSerializer
-    permission_classes = (Projects_Tasks_Members,)
+    permission_classes = (ProjectsTasksMembers,)
 
     def get_queryset(self):
         return Team.objects.filter()
-

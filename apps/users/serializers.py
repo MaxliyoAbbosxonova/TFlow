@@ -1,13 +1,13 @@
+from django.db import transaction
 from django.utils.text import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from rest_framework.fields import EmailField, CharField, IntegerField
-from rest_framework.serializers import Serializer, ModelSerializer
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.tokens import TokenError
+from rest_framework.fields import CharField, EmailField, IntegerField
+from rest_framework.serializers import ModelSerializer, Serializer
+from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 
-from shared.utils import check_sms_code, is_verified
-from users.models import Users, Profile
+from shared.utils import check_sms_code, clear_login_key, is_verified
+from users.models import Profile, Users
 
 
 class UserModelSerializer(ModelSerializer):
@@ -20,6 +20,20 @@ class ProfileModelSerializer(ModelSerializer):
     class Meta:
         model = Profile
         fields = "__all__"
+
+
+class ProfileDataForWorkspaceMembers(ModelSerializer):
+    class Meta:
+        model = Profile
+        fields = ('username', 'first_name', 'last_name', 'image')
+
+
+class UserListForWorkspaceMembers(ModelSerializer):
+    profile = ProfileDataForWorkspaceMembers()
+
+    class Meta:
+        model = Users
+        fields = ('id', 'email', 'phone', 'profile', 'status')
 
 
 class Register(ModelSerializer):
@@ -42,27 +56,29 @@ class Register(ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        password = validated_data.pop('password')
-        item = validated_data.pop('profile')
-        user = Users(**validated_data, profile=Profile.objects.create(**item))
-        user.set_password(password)
+        with transaction.atomic():
+            password = validated_data.pop('password')
+            item = validated_data.pop('profile')
+            user = Users(**validated_data, profile=Profile.objects.create(**item))
+            user.set_password(password)
 
-        user.save()
-        return user
+            user.save()
+            return user
 
 
 class LoginSerializer(Serializer):
     email = EmailField(max_length=50)
-    password = CharField(max_length=8)
+    password = CharField(write_only=True)
     token_class = RefreshToken
 
     def validate(self, validated_data):
         self.user = Users.objects.filter(email=validated_data['email']).first()
 
-        if not self.user:
+        if not (self.user and self.user.check_password(validated_data['password'])):
             raise ValidationError("Parol yoki email xato")
-        if not self.user.check_password(validated_data['password']):
-            raise ValidationError("Parol yoki email xato")
+
+        if self.user.status == Users.Status.BLOCKED or not self.user.is_active:
+            raise ValidationError("Foydalanuvchi bloklangan")
 
         return validated_data
 
@@ -99,7 +115,7 @@ class RefreshTokenSerializer(serializers.Serializer):
 
 class PasswordResetSerializer(Serializer):
     email = EmailField()
-    new_pass = CharField(max_length=8)
+    new_pass = CharField(write_only=True)
     token_class = RefreshToken
 
     def validate(self, validated_data):
@@ -119,6 +135,7 @@ class PasswordResetSerializer(Serializer):
         user = Users.objects.filter(email=email).first()
         user.set_password(password)
         user.save(update_fields=['password'])
+        clear_login_key(email)
 
         return user
 
@@ -164,3 +181,9 @@ class ChangeUserStatusSerializer(ModelSerializer):
     class Meta:
         model = Users
         fields = ("id", 'status')
+
+    def validate(self, attrs):
+        request = self.context["request"]
+        if self.instance.pk == request.user.pk and attrs.get("status") == Users.Status.BLOCKED:
+            raise ValidationError("O'zingizni bloklay olmaysiz.")
+        return attrs

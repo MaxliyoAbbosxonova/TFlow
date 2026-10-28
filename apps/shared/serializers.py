@@ -1,4 +1,4 @@
-from rest_framework.fields import ListField, FileField
+from rest_framework.fields import FileField, ListField
 from rest_framework.serializers import Serializer
 
 
@@ -27,6 +27,7 @@ class MultipleFileUploadSerializer(Serializer):
 
 
 from rest_framework import serializers
+
 from .models import FileUpload
 
 

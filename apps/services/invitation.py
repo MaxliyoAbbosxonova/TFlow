@@ -2,14 +2,13 @@ from datetime import timedelta
 
 from django.db import transaction
 from django.utils import timezone
-
 from workspace.models import WorkspaceInvitation
 from workspace.tasks import send_invitation_email_task
 
 
 @transaction.atomic
 def create_invitation(validated_data):
-    data = validated_data.copy() # data ni to'g'ridan to'g'ri o'zgartirmaslik uchun
+    data = validated_data.copy()  # data ni to'g'ridan to'g'ri o'zgartirmaslik uchun
     email = data['email']
     inviter = data['invited_by']
     role = data['role']

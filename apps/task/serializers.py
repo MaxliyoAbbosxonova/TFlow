@@ -1,10 +1,10 @@
-from rest_framework.exceptions import ValidationError
-from rest_framework.fields import IntegerField, ChoiceField, DateTimeField
-from rest_framework.serializers import ModelSerializer, ListSerializer, Serializer
-
 from project.models import Project
+from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.fields import ChoiceField, DateTimeField, IntegerField
+from rest_framework.serializers import ListSerializer, ModelSerializer, Serializer
 from shared.utils import RecursiveField
-from task.models import Task, Label
+from task.models import Label, Task
+from workspace.models import WorkspaceMember
 
 
 class TaskAdminModelSerializer(ModelSerializer):
@@ -20,11 +20,10 @@ class TaskModelSerializer(ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ("id", 'project', "title", 'description', "assignee", "reporter", "deadline", "priority", "children",
+        fields = ("id", 'project', "title", 'description', "assignee", "deadline", "priority", "children",
                   'parent', 'file')
 
     def validate(self, attrs):
-        # PATCH/PUT da qiymatlar attrs da bo'lmasligi mumkin, shuning uchun instance dan olamiz
         parent = attrs.get("parent", getattr(self.instance, "parent", None))
         project = attrs.get("project", getattr(self.instance, "project", None))
 
@@ -33,11 +32,16 @@ class TaskModelSerializer(ModelSerializer):
                 {"parent": "Subtask parent taskning projectidan tashqarida bo'lishi mumkin emas."}
             )
 
-        project = Project.objects.filter(id=attrs['project']).first()
-        if project.status == Project.Status.ARCHIVED:
-            return ValidationError('You Can`t create task for ARCHIVED project ')
+        if project and project.status == Project.Status.ARCHIVED:
+            raise ValidationError("ARCHIVED project uchun task yaratib bo'lmaydi.")
 
         return attrs
+
+    def validate_project(self, project):
+        if self.instance and project != self.instance.project:
+            raise ValidationError("Task'ni boshqa project'ga ko'chirib bo'lmaydi.")
+        return project
+
 
 class ChangeAssigneeSerializer(Serializer):
     pass
@@ -64,14 +68,29 @@ class LabelModelSerilalizer(ModelSerializer):
         model = Label
         fields = '__all__'
 
-    def validate(self, validated_data):
-        name = validated_data['name']
-        color = validated_data['color']
-        workspace = validated_data['workspace']
+    def validate_workspace(self, ws):
+        request = self.context.get("request")
+        if request is not None:
+            user = request.user
+            allowed = (
+                    user.is_staff
+                    or ws.owner_id == user.id
+                    or ws.members.filter(user=user, role=WorkspaceMember.Role.MANAGER).exists()
+            )
+            if not allowed:
+                raise PermissionDenied("Bu workspace'da label yarata olmaysiz.")
+        return ws
 
-        if Label.objects.filter(name=name, color=color, workspace=workspace).exists():
-            raise ValidationError("Label alla qachon qo'shilgan")
-        return validated_data
+    def validate_project(self, project):
+        if self.instance and project != self.instance.project:
+            raise ValidationError("Task'ni boshqa project'ga ko'chirib bo'lmaydi.")
+        return project
+
+    def validate(self, attrs):
+        if Label.objects.filter(name=attrs['name'], color=attrs.get('color', '#000000'),
+                                workspace=attrs['workspace']).exists():
+            raise ValidationError("Label allaqachon qo'shilgan")
+        return attrs
 
 
 class LabelDestroySerilalizer(ModelSerializer):
@@ -95,6 +114,8 @@ class AttachLabelSerilaizer(Serializer):
         label_id = validated_data['label']
         task = Task.objects.filter(id=task_id).first()
         label = Label.objects.filter(id=label_id).first()
+        if not label:
+            raise ValidationError('bad request')
         if task.project.workspace != label.workspace:
             raise ValidationError("Label va Task bir workspace dan emas")
         if Task.objects.filter(id=task_id, label=label_id).exists():
