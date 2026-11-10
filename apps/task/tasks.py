@@ -1,3 +1,5 @@
+import os
+
 from celery import shared_task
 from comment.models import Comments
 from django.core.mail import send_mail
@@ -6,6 +8,7 @@ from services.notification import send_notification
 from task.models import Task
 from users.models import Profile
 
+from_email= os.getenv('EMAIL_HOST_USER')
 
 @shared_task
 def send_assignee_notification_task(task_id):
@@ -22,7 +25,7 @@ def send_assignee_notification_task(task_id):
     send_mail(
         subject=subject,
         message=message,
-        from_email="makhliyoabboskhonova@gmail.com",
+        from_email=from_email,
         recipient_list=[task.assignee.user.email],
         fail_silently=False,
     )
@@ -45,7 +48,7 @@ def send_status_notification_task(task_id):
     send_mail(
         subject=subject,
         message=message,
-        from_email="makhliyoabboskhonova@gmail.com",
+        from_email=from_email,
         recipient_list=[task.assignee.user.email],
         fail_silently=False,
     )
@@ -67,7 +70,7 @@ def comment_mention_email_task(profile_id, comment_id, task_id, text):
     send_mail(
         subject=subject,
         message=text,
-        from_email="makhliyoabboskhonova@gmail.com",
+        from_email=from_email,
         recipient_list=[profile.user.email],
         fail_silently=False,
     )

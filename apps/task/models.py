@@ -8,7 +8,7 @@ from django.db.models import (
     ManyToManyField,
     Model,
     TextChoices,
-    TextField,
+    TextField, BooleanField,
 )
 from django.db.models.fields import CharField
 from mptt.fields import TreeForeignKey
@@ -45,9 +45,9 @@ class Task(MPTTModel):
         CRITICAL = 'CRITICAL', 'critical'
 
     parent = TreeForeignKey('self', CASCADE, null=True, blank=True)
-    title = CharField(max_length=32, default='improvement')
+    title = CharField(max_length=255, default='improvement')
     description = TextField(max_length=500, default='Improve bugs')
-    assignee = ForeignKey(WorkspaceMember, related_name='assigned_task', null=True, on_delete=RESTRICT)
+    assignee = ForeignKey(WorkspaceMember, related_name='assigned_task',null=True, on_delete=RESTRICT,blank=True)
     reporter = ForeignKey(WorkspaceMember, related_name='reported_task', on_delete=RESTRICT, null=True)
     priority = CharField(max_length=10, choices=Priority.choices, default=Priority.LOW)
     deadline = DateTimeField(null=True, blank=True)
@@ -57,6 +57,7 @@ class Task(MPTTModel):
     label = ManyToManyField(Label, related_name="tasks")
     created_at = DateTimeField(auto_now_add=True, )
     completed_at = DateTimeField(null=True, blank=True)
+    is_overdue=BooleanField(default=False)
 
     class MPTTMeta:
         order_insertion_by = ['title']

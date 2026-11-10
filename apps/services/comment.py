@@ -71,7 +71,7 @@ def reply_comment(validated_data, request):
 
         if not profile:
             continue
-        transaction.on_commit(lambda p=profile: comment_mention_email_task.delay(p.id, comment, task, text))
+        transaction.on_commit(lambda p=profile: comment_mention_email_task.delay(p.id, comment.id, task.id, text))
     if task.project_id:
         emit_to_project(task.project_id, "comment:created", {
             "task_id": task.id,

@@ -2,14 +2,14 @@ services:
   web:
     build: .
     container_name: tflow_web
-    command: python manage.py runserver 0.0.0.0:8000
+    command: daphne -b 0.0.0.0 -p 8000 root.asgi:application
     volumes:
       - .:/app
       - media_data:/app/media
     ports:
       - "8000:8000"
     env_file:
-      - env/.env
+      - root/env/.env
     depends_on:
       db:
         condition: service_healthy
@@ -23,7 +23,7 @@ services:
     volumes:
       - .:/app
     env_file:
-      - env/.env
+      - root/env/.env
     depends_on:
       db:
         condition: service_healthy
@@ -38,7 +38,7 @@ services:
     volumes:
       - .:/app
     env_file:
-      - env/.env
+      - root/env/.env
     depends_on:
       db:
         condition: service_healthy

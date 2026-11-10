@@ -1,5 +1,6 @@
 import importlib
 import inspect
+import os
 import time
 from random import randint
 
@@ -129,8 +130,8 @@ class RecursiveField(Field):
 
         return object.__getattribute__(self, name)
 
-
-redis_client = redis.StrictRedis(host='redis', port=6379, db=0, decode_responses=True)
+REDIS_HOST=os.getenv('REDIS_HOST')
+redis_client = redis.StrictRedis(host=REDIS_HOST, port=6379, db=0, decode_responses=True)
 
 
 def random_code():

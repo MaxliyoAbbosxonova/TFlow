@@ -20,8 +20,11 @@ class TaskModelSerializer(ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ("id", 'project', "title", 'description', "assignee", "deadline", "priority", "children",
-                  'parent', 'file')
+        fields = ("id", "project", "title", 'description', "assignee", "deadline", "priority", "children",
+                  "parent", "file")
+        read_only_fields=('assignee','deadline','priority')
+
+
 
     def validate(self, attrs):
         parent = attrs.get("parent", getattr(self.instance, "parent", None))

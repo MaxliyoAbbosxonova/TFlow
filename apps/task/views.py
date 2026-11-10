@@ -2,7 +2,6 @@ from django.db import transaction
 from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
-from realtime.utils import emit_to_project
 from rest_framework.generics import (
     CreateAPIView,
     DestroyAPIView,
@@ -15,6 +14,8 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED
 from rest_framework.views import APIView
+
+from realtime.utils import emit_to_project
 from services.audit import create_audit_log
 from services.tasks import (
     attach_label,
@@ -46,7 +47,8 @@ from task.serializers import (
     TaskAdminModelSerializer,
     TaskModelSerializer,
 )
-from workspace.models import Workspace, WorkspaceMember
+from workspace.models import WorkspaceMember
+
 
 # Create your views here.
 
@@ -80,7 +82,7 @@ class TaskCreateApiView(CreateAPIView):
         return Response(data={'task': task.id,
                               'titile': task.title,
                               'reporter': task.reporter.id,
-                              'assignee': task.assignee.id,
+                              'assignee': task.assignee_id,
                               'project': task.project.title}, status=HTTP_201_CREATED)
 
 
@@ -124,7 +126,7 @@ class ChangePriority(APIView):
     def patch(self, request, task_id):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
-        change_priority(task_id, serializer.validated_data['priority'],user_id=request.user.id)
+        change_priority(task_id, serializer.validated_data['priority'], user_id=request.user.id)
         return Response({'detail': "Priority o`zgartirildi."}, status=HTTP_200_OK)
 
 
@@ -136,7 +138,7 @@ class ChangeDeadLine(APIView):
     def patch(self, request, task_id):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
-        change_deadline(task_id, serializer.validated_data['deadline'],user_id=request.user.id)
+        change_deadline(task_id, serializer.validated_data['deadline'], user_id=request.user.id)
         return Response({'detail': "Deadline o`zgartirildi."}, status=HTTP_200_OK)
 
 
@@ -148,8 +150,7 @@ class ChangeStatus(APIView):
     def patch(self, request, task_id):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
-        actor = WorkspaceMember.objects.filter(user=request.user).first()
-        change_status(task_id, serializer.validated_data['status'], actor)
+        change_status(task_id, serializer.validated_data['status'], user_id=request.user.id)
         return Response({'detail': "Status o`zgartirildi."}, status=HTTP_200_OK)
 
 
@@ -161,7 +162,7 @@ class DeleteTaskApiView(APIView):
     def patch(self, request, task_id):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
-        delete_task(task_id,request.user.id)
+        delete_task(task_id, request.user.id)
         return Response({'detail': "Task o`chirildi"}, status=HTTP_200_OK)
 
 
@@ -172,44 +173,10 @@ class LabelListApiView(ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-
-        print("USER:", user.id, user.email)
-
-        print(
-            "WORKSPACES:",
-            list(
-                Workspace.objects.filter(
-                    Q(owner=user) | Q(members__user=user)
-                ).distinct().values_list("id", flat=True)
-            )
-        )
-
         qs = Label.objects.filter(
             Q(workspace__owner=user) |
             Q(workspace__members__user=user)
         ).distinct()
-
-        print(
-            "LABELS:",
-            list(qs.values_list("id", "name", "workspace_id"))
-        )
-        print(
-            "OWNED:",
-            list(
-                Workspace.objects.filter(
-                    owner=user
-                ).values_list("id", flat=True)
-            )
-        )
-
-        print(
-            "MEMBER:",
-            list(
-                WorkspaceMember.objects.filter(
-                    user=user
-                ).values_list("workspace_id", flat=True)
-            )
-        )
 
         ws_id = self.request.query_params.get("workspace")
         return qs.filter(workspace_id=ws_id) if ws_id else qs
