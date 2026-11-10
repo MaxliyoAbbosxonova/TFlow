@@ -1,3 +1,4 @@
+import os
 import time
 
 from celery import shared_task
@@ -9,7 +10,7 @@ from workspace.models import WorkspaceMember
 
 from root.settings import FRONTEND_URL
 
-
+from_email= os.getenv('EMAIL_HOST_USER')
 @shared_task
 def test_task():
     time.sleep(3)
@@ -35,7 +36,7 @@ def send_invitation_email_task(invitation_id):
     send_mail(
         subject=subject,
         message=message,
-        from_email="makhliyoabboskhonova@gmail.com",
+        from_email=from_email,
         recipient_list=[invitation.email],
         fail_silently=False,
     )
@@ -56,7 +57,7 @@ def send_invitation_accept_email_task(member_id):
     send_mail(
         subject=subject,
         message=message,
-        from_email="makhliyoabboskhonova@gmail.com",
+        from_email=from_email,
         recipient_list=[member.user.email],
         fail_silently=False,
     )

@@ -7,7 +7,7 @@ __pycache__/
 .gitignore
 .idea/
 .env
-env/.env
+root/env/.env
 db.sqlite3
 
 .pytest_cache/

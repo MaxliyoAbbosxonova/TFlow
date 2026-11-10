@@ -16,7 +16,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv('env/.env')
+load_dotenv('root/env/.env')
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -26,11 +26,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 
 SECRET_KEY = os.getenv('SECRET_KEY')
-DEBUG = os.getenv('DEBUG')
+DEBUG = bool(os.getenv('DEBUG'))
 # SECURITY WARNING: don't run with debug turned on in production!
 
-
-ALLOWED_HOSTS = ['*']
+hosts_list = os.getenv('ALLOWED_HOSTS')
+ALLOWED_HOSTS = hosts_list.split(',') if hosts_list else []
 sys.path.append('apps')
 AUTH_USER_MODEL = 'users.Users'
 # Application definition
@@ -117,24 +117,24 @@ DATABASES = {
         'PORT': os.getenv('DB_PORT', '5432'),
     }
 }
-
+#
 # Password validation
 # https://docs.djangoproject.com/en/6.1/ref/settings/#auth-password-validators
 
-# AUTH_PASSWORD_VALIDATORS = [
-#     {
-#         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-#     },
-#     {
-#         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-#     },
-#     {
-#         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-#     },
-#     {
-#         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-#     },
-# ]
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.1/topics/i18n/
@@ -192,8 +192,8 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(days=30),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=60)
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(minutes=30)
 }
 SPECTACULAR_SETTINGS = {
     'TITLE': 'TaskFlow',
@@ -224,9 +224,3 @@ CACHES = {
 STATS_CACHE_TTL = int(os.environ.get("STATS_CACHE_TTL_SECONDS", 21600))
 
 FRONTEND_URL = os.getenv('FRONTEND_URL')
-# qiwj rnwh deng fzry
-# user access mira
-# eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzg5Nzk5MTI2LCJpYXQiOjE3ODcyMDcxMjYsImp0aSI6IjgzMjVjYjQxZWYxYjQ1MWI4YTlmMTJhNWUxY2U2ZDVhIiwidXNlcl9pZCI6IjIifQ.QWM3rPP25QNQOBjvruRj6X2MRCVsNPHDTKi2Yg3JF_o
-
-# mila admin
-# eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzkyMjM3OTI4LCJpYXQiOjE3ODk2NDU5MjgsImp0aSI6Ijg4MzgzMTY4M2FlNTQ4Nzc4NzViZTQ4ODMyM2M4Y2Y4IiwidXNlcl9pZCI6IjEifQ.KEf008ED04f5cuoHPtBqJvLbupulHOc9UB34Iv_5BHA

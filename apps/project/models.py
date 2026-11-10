@@ -5,11 +5,13 @@ from django.db.models import (
     ForeignKey,
     Model,
     TextChoices,
-    TextField,
+    TextField, UniqueConstraint,
 )
 from django.db.models.fields import CharField
+
 from team.models import Team
 from workspace.models import WorkspaceMember
+
 
 # Create your models here.
 
@@ -20,14 +22,17 @@ class Project(Model):
         COMPLETED = 'COMPLETED', 'completed'
         ARCHIVED = 'ARCHIVED', 'archived'
 
-    title = CharField(max_length=100, unique=True, default="Name")
+    title = CharField(max_length=100, default="Name")
     team = ForeignKey(Team, related_name='projects', on_delete=RESTRICT, null=True, blank=True)
-    workspace = ForeignKey('workspace.Workspace', related_name="products", null=True, on_delete=CASCADE)
-    member = ForeignKey(WorkspaceMember, related_name='project', on_delete=RESTRICT, null=True)
+    workspace = ForeignKey('workspace.Workspace', related_name="projects", on_delete=CASCADE)
+    member = ForeignKey(WorkspaceMember, related_name='projects', on_delete=RESTRICT, null=True)
     status = CharField(max_length=15, choices=Status.choices, default=Status.PLANNED)
-    description = TextField(max_length=320, null=True)
+    description = TextField(max_length=320, null=True,blank=True)
     start_date = DateTimeField(auto_now_add=True)
     deadline = DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return self.title
+
+    class Meta:
+        constraints = [UniqueConstraint(fields=['title', 'workspace'], name='unique_project')]

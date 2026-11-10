@@ -1,3 +1,5 @@
+from django.db.models import UniqueConstraint
+
 from project.models import Project
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.serializers import ModelSerializer

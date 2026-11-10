@@ -11,7 +11,7 @@ from task.models import Task
 def run_two_attempts(task, member):
     def attempt(_):
         try:
-            change_status(task.id, Task.Workflow.IN_PROGRESS, member)
+            change_status(task.id, "IN_PROGRESS", member.user_id)
             return "ok"
         except ValidationError:
             return "rejected"

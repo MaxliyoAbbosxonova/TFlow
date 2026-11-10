@@ -6,12 +6,11 @@ db.sqlite3
 *.sqlite3
 # Virtual muhit
 venv/
-ENV/
-env/.env/
+root/env/
+root/env/.env/
 .venv/
 _trial_temp/
-**/migrations/**
-!**/migrations/__init__.py
+
 # Jupyter notebook
 .ipynb_checkpoints/
 
@@ -25,7 +24,7 @@ media
 # Tarjima file lari
 *.mo
 # Maksfiy sozlamalar
-env/.env
+root/env/.env
 *.env
 
 # JetBrains / PyCharm (.idea) katalogi
