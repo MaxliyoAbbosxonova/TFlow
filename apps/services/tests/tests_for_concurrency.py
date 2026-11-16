@@ -5,13 +5,13 @@ from audit_log.models import AuditLog
 from django.db import connection
 from rest_framework.exceptions import ValidationError
 from services.tasks import change_status
-from task.models import Task
+from task.models import Task, WorkflowStatus
 
 
 def run_two_attempts(task, member):
     def attempt(_):
         try:
-            change_status(task.id, "IN_PROGRESS", member.user_id)
+            change_status(task.id, WorkflowStatus.Category.IN_PROGRESS, member)
             return "ok"
         except ValidationError:
             return "rejected"

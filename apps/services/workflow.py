@@ -1,30 +1,28 @@
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.exceptions import ValidationError
-from task.models import Task
-
-ALLOWED_TRANSITIONS = {
-    Task.Workflow.TODO: {Task.Workflow.IN_PROGRESS, Task.Workflow.ARCHIVED},
-    Task.Workflow.IN_PROGRESS: {Task.Workflow.TODO, Task.Workflow.CODE_REVIEW, Task.Workflow.ARCHIVED},
-    Task.Workflow.CODE_REVIEW: {Task.Workflow.IN_PROGRESS, Task.Workflow.QA, Task.Workflow.ARCHIVED},
-    Task.Workflow.QA: {Task.Workflow.CODE_REVIEW, Task.Workflow.DONE, Task.Workflow.ARCHIVED},
-    Task.Workflow.DONE: {Task.Workflow.QA, Task.Workflow.ARCHIVED},
-    Task.Workflow.ARCHIVED: set(),
-}
+from task.models import Task, WorkflowStatus, WorkflowTransition
 
 
-def validate_status(current_status, new_status):
+
+def validate_status(current_status, new_status,project):
     if current_status == new_status:
         raise ValidationError(f"Task allaqachon '{new_status}' statusida.")
 
-    allowed = ALLOWED_TRANSITIONS.get(current_status, set())
-    if new_status not in allowed:
+    try:
+        workflow=project.workflow
+    except ObjectDoesNotExist:
+        raise ValidationError("Bu loyihada workflow sozlanmagan:")
+    if new_status.workflow.id!=workflow.id:
+        raise ValidationError("Bu status shu loyihaga tegishli emas.")
+
+    allowed=WorkflowTransition.objects.filter(workflow=project.workflow,from_status=current_status,to_status=new_status).exists()
+    if  not  allowed:
         raise ValidationError(
-            f"'{current_status}' statusidan '{new_status}' statusiga o'tish mumkin emas. "
-            f"Ruxsat etilgan: {', '.join(allowed) or 'yo`q'}"
+            f"'{current_status}' statusidan '{new_status.name}' statusiga o'tish mumkin emas. "
         )
 
-
 def validate_subtask_done(task):
-    incomplete_children = task.get_children().exclude(status=Task.Workflow.DONE)
+    incomplete_children = task.get_children().exclude(status__category=WorkflowStatus.Category.DONE)
     if incomplete_children.exists():
         titles = ', '.join(incomplete_children.values_list('title', flat=True))
         raise ValidationError(

@@ -1,9 +1,11 @@
+from rest_framework.relations import PrimaryKeyRelatedField
+
 from project.models import Project
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.fields import ChoiceField, DateTimeField, IntegerField
 from rest_framework.serializers import ListSerializer, ModelSerializer, Serializer
 from shared.utils import RecursiveField
-from task.models import Label, Task
+from task.models import Label, Task,WorkflowStatus
 from workspace.models import WorkspaceMember
 
 
@@ -59,8 +61,7 @@ class ChangeDeadLineSerializer(Serializer):
 
 
 class ChangeStatusSerializer(Serializer):
-    status = ChoiceField(choices=Task.Workflow.choices)
-
+    status = PrimaryKeyRelatedField(queryset=WorkflowStatus.objects.all())
 
 class DeleteTaskSerializer(Serializer):
     pass

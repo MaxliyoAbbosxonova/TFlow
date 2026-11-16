@@ -150,7 +150,8 @@ class ChangeStatus(APIView):
     def patch(self, request, task_id):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
-        change_status(task_id, serializer.validated_data['status'], user_id=request.user.id)
+        WorkspaceMember.objects.filter(user=request.user,)
+        change_status(task_id, serializer.validated_data['status'],user_id=request.user.id)
         return Response({'detail': "Status o`zgartirildi."}, status=HTTP_200_OK)
 
 

@@ -1,9 +1,11 @@
 from datetime import timedelta
 
+from django.db.models import Model
+
 from audit_log.models import AuditLog
 from django.urls import reverse
 from django.utils import timezone
-from task.models import Label, Task
+from task.models import Label, Task, WorkflowStatus
 from users.models import Users
 from workspace.models import WorkspaceMember
 
@@ -136,10 +138,10 @@ def status_url(task):
 
 def test_owner_can_change_status(auth_client, ready_task):
     """Owner statusni o'zgartira oladi (200)."""
-    r = auth_client.patch(status_url(ready_task), {"status": Task.Workflow.IN_PROGRESS})
+    r = auth_client.patch(status_url(ready_task), {"status": WorkflowStatus.Category.IN_PROGRESS})
     assert r.status_code == 200, r.data
     ready_task.refresh_from_db()
-    assert ready_task.status == Task.Workflow.IN_PROGRESS
+    assert ready_task.status == WorkflowStatus.Category.IN_PROGRESS
 
 
 def test_assignee_employee_can_change_status(api_client, employee, ready_task):
@@ -147,28 +149,28 @@ def test_assignee_employee_can_change_status(api_client, employee, ready_task):
     user, emp_member = employee
     Task.objects.filter(pk=ready_task.pk).update(assignee=emp_member)
     api_client.force_authenticate(user=user)
-    r = api_client.patch(status_url(ready_task), {"status": Task.Workflow.IN_PROGRESS})
+    r = api_client.patch(status_url(ready_task), {"status": WorkflowStatus.Category.IN_PROGRESS})
     assert r.status_code == 200, r.data
 
 
 def test_non_assignee_employee_cannot_change_status(employee_client, ready_task):
     """Assignee bo'lmagan EMPLOYEE o'zgartira olmaydi (403), status o'zgarmaydi."""
-    r = employee_client.patch(status_url(ready_task), {"status": Task.Workflow.IN_PROGRESS})
+    r = employee_client.patch(status_url(ready_task), {"status": WorkflowStatus.Category.IN_PROGRESS})
     assert r.status_code == 403
     ready_task.refresh_from_db()
-    assert ready_task.status == Task.Workflow.TODO
+    assert ready_task.status == WorkflowStatus.Category.TODO
 
 
 def test_stranger_cannot_change_status(api_client, stranger, ready_task):
     """Begona o'zgartira olmaydi (403)."""
     api_client.force_authenticate(user=stranger)
-    r = api_client.patch(status_url(ready_task), {"status": Task.Workflow.IN_PROGRESS})
+    r = api_client.patch(status_url(ready_task), {"status": WorkflowStatus.Category.IN_PROGRESS})
     assert r.status_code == 403
 
 
 def test_anonymous_cannot_change_status(api_client, ready_task):
     """Login qilmagan foydalanuvchi o'zgartira olmaydi."""
-    r = api_client.patch(status_url(ready_task), {"status": Task.Workflow.IN_PROGRESS})
+    r = api_client.patch(status_url(ready_task), {"status": WorkflowStatus.Category.IN_PROGRESS})
     assert r.status_code in (401, 403)
 
 
@@ -176,15 +178,15 @@ def test_anonymous_cannot_change_status(api_client, ready_task):
 
 def test_invalid_transition_returns_400(auth_client, ready_task):
     """TODO -> DONE ruxsat etilmagan: 400, status o'zgarmaydi."""
-    r = auth_client.patch(status_url(ready_task), {"status": Task.Workflow.DONE})
+    r = auth_client.patch(status_url(ready_task), {"status": WorkflowStatus.Category.DONE})
     assert r.status_code == 400
     ready_task.refresh_from_db()
-    assert ready_task.status == Task.Workflow.TODO
+    assert ready_task.status ==WorkflowStatus.Category.TODO
 
 
 def test_same_status_returns_400(auth_client, ready_task):
     """Allaqachon shu statusda bo'lsa: 400."""
-    r = auth_client.patch(status_url(ready_task), {"status": Task.Workflow.TODO})
+    r = auth_client.patch(status_url(ready_task), {"status": WorkflowStatus.Category.TODO})
     assert r.status_code == 400
 
 
@@ -196,16 +198,16 @@ def test_unknown_status_value_returns_400(auth_client, ready_task):
 
 def test_deadline_required_for_status_change(auth_client, task):
     """Deadline yo'q task'ning statusi o'zgarmaydi (400)."""
-    r = auth_client.patch(status_url(task), {"status": Task.Workflow.IN_PROGRESS})
+    r = auth_client.patch(status_url(task), {"status": WorkflowStatus.Category.IN_PROGRESS})
     assert r.status_code == 400
     task.refresh_from_db()
-    assert task.status == Task.Workflow.TODO
+    assert task.status == WorkflowStatus.Category.TODO
 
 
 def test_done_sets_completed_at(auth_client, ready_task):
     """DONE ga o'tganda completed_at to'ldiriladi."""
-    Task.objects.filter(pk=ready_task.pk).update(status=Task.Workflow.QA)
-    r = auth_client.patch(status_url(ready_task), {"status": Task.Workflow.DONE})
+    Task.objects.filter(pk=ready_task.pk).update(status=WorkflowStatus.Category.QA)
+    r = auth_client.patch(status_url(ready_task), {"status": WorkflowStatus.Category.DONE})
     assert r.status_code == 200, r.data
     ready_task.refresh_from_db()
     assert ready_task.completed_at is not None
@@ -213,11 +215,11 @@ def test_done_sets_completed_at(auth_client, ready_task):
 
 def test_done_blocked_by_unfinished_subtask(auth_client, ready_task, subtask):
     """Tugamagan subtask bo'lsa DONE rad etiladi (400)."""
-    Task.objects.filter(pk=ready_task.pk).update(status=Task.Workflow.QA)
-    r = auth_client.patch(status_url(ready_task), {"status": Task.Workflow.DONE})
+    Task.objects.filter(pk=ready_task.pk).update(status=WorkflowStatus.Category.QA)
+    r = auth_client.patch(status_url(ready_task), {"status": WorkflowStatus.Category.DONE})
     assert r.status_code == 400
     ready_task.refresh_from_db()
-    assert ready_task.status == Task.Workflow.QA
+    assert ready_task.status == WorkflowStatus.Category.QA
 
 
 # -------------------------------------------------------------------- Change priority apiview
@@ -299,7 +301,7 @@ def test_owner_can_archive_task(auth_client, task):
     r = auth_client.patch(url("task-delete", task), {})
     assert r.status_code == 200, r.data
     task.refresh_from_db()
-    assert task.status == Task.Workflow.ARCHIVED
+    assert task.status == WorkflowStatus.Category.ARCHIVED
 
 
 def test_employee_cannot_archive_task(employee_client, task):
@@ -307,7 +309,7 @@ def test_employee_cannot_archive_task(employee_client, task):
     r = employee_client.patch(url("task-delete", task), {})
     assert r.status_code == 403
     task.refresh_from_db()
-    assert task.status == Task.Workflow.TODO
+    assert task.status == WorkflowStatus.Category.TODO
 
 
 def test_stranger_cannot_archive_task(api_client, stranger, task):
@@ -329,7 +331,7 @@ def test_archive_writes_audit_log(auth_client, task):
 
 def test_archiving_archived_task_is_rejected(auth_client, task):
     """ARCHIVED task'ni qayta arxivlab bo'lmaydi (400)."""
-    Task.objects.filter(pk=task.pk).update(status=Task.Workflow.ARCHIVED)
+    Task.objects.filter(pk=task.pk).update(status=WorkflowStatus.Category.ARCHIVED)
     r = auth_client.patch(url("task-delete", task), {})
     assert r.status_code == 400
 

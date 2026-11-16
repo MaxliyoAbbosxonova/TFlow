@@ -18,7 +18,7 @@ _trial_temp/
 *.log
 *.tmp
 *.bak
-
+celerybeat-schedule*
 static
 media
 # Tarjima file lari
